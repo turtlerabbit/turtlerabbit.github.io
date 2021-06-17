@@ -1,0 +1,236 @@
+---
+title: FULL STACK WFP 06 - Creating a Card Control
+date: '2021-05-12 06'
+tag: WPF, FullStack, Converter
+---
+#
+MajorIndex 데이터에 대한 card control과 MajorIndexListingViewModel에 대한 user control을 만든다.  
+그런 다음 HomeView에서 MajorIndex 데이터를 볼 수 있도록 MajorIndexListingViewModel에 대한 컨트롤을 HomeView에 추가한다.   
+마지막으로 시작시 HomeView를 자동으로 표시하도록 응용 프로그램을 설정했다.
+#
+### 1. Creating a card control for the MajorIndex data
+![alt](https://lh3.googleusercontent.com/xDqYYpVR8b994MLsd3Gvg-tYxvJqBGJ6QkS9S6ppfae5ABk3msDBigxhtjPk3DRHcDkdwTYNjRh0ozx8sOdeu87sjioqH5pHhugsSggOYg5ppTCYZXWNhyeKDVGzVH1RJetOkLC7ThMwb2uAnibIGid25QZU4TzKzUXj8rBUSoAlMjiD5TjfwojybDKIpW9RNMDEK54ZnIDm55B5WQxj6lBTVrVI_TW1w2_uz20d4sK4iYS93EUHT3Xd9nrhYTLU-axw_d-gC-7e9_zVldZbwjgWBNWzstPjwXUkEQWEq42zsEK1NQA1ppS2WVFPWC6JZXXPS9z1B5euhZnjyxc4_re7RC_8oE9VHGdmH1Y4gn7sjs4dDQGfRXdQHc6cPFziYt4wnR9IdKBBVTBnOcPkYOawAfqviJBn6geD4gPX5sfr3jrGEUX8PtSZY_n7yYMiOmE2fTpBTlUKrSZTD7oLJFPq15B-GPfd9EVmMUkKtcQG6RhpghKE8IiSbKOr8YE85xzbJmzVBugwpeA7wlYfWJHqW0EMFrFPLKYsR-ybTVArxZuLJcEXf7zbEOFYAdnS44LEWfRB_qjb1UHx2bxUCL40XKhmownf2GJOsB5JhhEl67_JGOSDrxSzVtN26Sm_p8D2bzfNsqzDwQuZiW-RzrkGW-3LcS2YwhaXfUj4LP8vm-gyMWSvtndxSDtIdmh_0RWD_ma16V-J_luIJpIb2w=w1119-h517-no?authuser=0)
+* SimpleTrader.WPF / Controls / MajorIndexCard.xaml (UserContorl)
+    ```js
+    <Border BorderBrush="LightGray" BorderThickness="1" CornerRadius="10">
+        <Grid Margin="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="auto" />
+                <RowDefinition Height="auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" FontSize="18" 
+                       HorizontalAlignment="Center"
+                       Text="{Binding Type, FallbackValue=Name}" />
+            <Grid Grid.Row="1" Margin="0 10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="auto" />
+                    <RowDefinition Height="auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Margin="5" Text="Price" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Margin="5" 
+                    Text="{Binding Price, StringFormat={}{0:c}, FallbackValue=$0.00}" />
+
+                <TextBlock Grid.Row="1" Grid.Column="0" Margin="5" 
+                           HorizontalAlignment="Right" Text="Changes" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Margin="5" 
+                    HorizontalAlignment="Right" 
+                    Text="{Binding Changes, StringFormat={}{0:c}, FallbackValue=$0.00}" />
+            </Grid>
+        </Grid>
+    </Border>
+    ```
+* SimpleTrader.WPF / Controls / HomeView.xaml
+    ```js
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="auto" />
+            <RowDefinition Height="auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Home" />
+        <controls:MajorIndexCard 
+                    Grid.Row="1" Margin="0 10" HorizontalAlignment="Center"
+                    // testing - MajorIndex 데이터를 MajorIndexCard(card control)에 적용
+                    DataContext="{Binding MajorIndexListingViewModel.DowJones}" />
+    </Grid>
+    ```
+* SimpleTrader.WPF / ViewModels / ViewmodelBase.cs
+    ```js
+    // public class ObservableObject : INotifyPropertyChanged
+    // ViewModelBase ObservableObject 상속으로 INotifyPropertyChanged 적용
+
+    public class ViewModelBase : ObservableObject
+    {
+    }
+
+    #
+
+    // MajorIndexViewModel => MajorIndexListingViewModel (renaming)
+    // ViewModelBase 상속 -> OnPropertyChanged(nameof(DowJones));
+
+    public class MajorIndexListingViewModel : ViewModelBase
+    {
+        private readonly IMajorIndexService _majorIndexService;
+
+        private MajorIndex _dowJones;
+        public MajorIndex DowJones 
+        {
+            get
+            {
+                return _dowJones;
+            }
+            set
+            {
+                _dowJones = value;
+                OnPropertyChanged(nameof(DowJones));
+            }
+        }
+
+        private MajorIndex _nasdaq;
+        public MajorIndex Nasdaq
+        {
+            get
+            {
+                return _nasdaq;
+            }
+            set
+            {
+                _nasdaq = value;
+                OnPropertyChanged(nameof(Nasdaq));
+            }
+        }
+
+        private MajorIndex _sp500;
+        public MajorIndex SP500
+        {
+            get
+            {
+                return _sp500;
+            }
+            set
+            {
+                _sp500 = value;
+                OnPropertyChanged(nameof(SP500));
+            }
+        }
+
+        ....    
+    ```
+#
+### 2. MajorIndexListingViewModel에 대한 user control를 만든다.
+![alt](https://lh3.googleusercontent.com/qf1J7ZKsxAJ6pDtXzKYxIKI0oqfv8qraHayI_IDICyvnSsYMI9G6GOUc3FL8EW9kVRjciCzsjPqARQztFemnS1fxAmWhWrn-TLn8otjjJNzDgMc0l75n1I8SVPurEOVUYpvp2HCt0owz5LNceyLcOrqrnd4-QNRHNTn2v8qTnxvp-VYuEZXThjSTyz4ozHbAXNoxa6DQsK99LlqphjyJrAgZ9iQtfROUfOHX8ndj3oF_f3w_dYBCBoumjw2u46_pV5gLHzOWzx2c49KzHkRaenJhuL9-8O_Mvsc-791MNqFtGKrzBg1S20nbxo4suQurrY3Zs97brV8sxJqtsdUz_i-1yDJzWiiaNlEYnazSCbjGHviZP0_ii5e-MYErbuQ0AuEjRLReq8WM7vl6H_I-MCETdbJV3rA0DFq5oBSQmG-D8PzqO3PKoVla3SB53toMAzJRCz7GFpX26oI1lzeFZRTqa0frpxK7HUg_7-vtkESkq3PPUVN2BEOCVIqpv64j015SqvaoAXP6tUf83jTCLQ0WUQZwaO-dXkzSN0wbzU4udz-5jtn66IKI_YyqSOeAIGVWPaOA_T-tPykIRyJQ44GKUZt-HKlAw8rYJEJgFaMdahmym-r_-7vqr9aJuRlfxLaw2dc4rVm249bz9GLCrbeHXMArBE9yEUnW-R0o3KQgT9HMaUiElLQwIQq1H8PPmBf9FZdt7E_SQQE68H9__w=w1083-h355-no?authuser=0)
+* SimpleTrader.WPF / Controls / MajorIndexListing.xaml (UserContorl)
+    ```js
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="auto" />
+            <RowDefinition Height="auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" FontSize="18" Text="Major Indexes" />
+        <Grid Grid.Row="1" Margin="0 10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <local:MajorIndexCard Grid.Column="0" Margin="10 0" 
+                                  DataContext="{Binding Nasdaq}" />
+            <local:MajorIndexCard Grid.Column="1" Margin="10 0" 
+                                  DataContext="{Binding DowJones}" />
+            <local:MajorIndexCard Grid.Column="2" Margin="10 0" 
+                                  DataContext="{Binding SP500}" />
+        </Grid>
+    </Grid>
+    ```
+* SimpleTrader.WPF / Controls / HomeView.xaml
+    ```js
+    ....
+
+    <controls:MajorIndexListing Grid.Row="1" Margin="0 10" HorizontalAlignment="Center"
+                                 DataContext="{Binding MajorIndexListingViewModel}" />
+    
+    ....
+    ```
+#
+### 3. 시작시 HomeView를 자동으로 표시하도록 응용 프로그램 설정
+* SimpleTrader.WPF / ViewModels / MainViewModel.cs
+    ```js
+    // HomeView가 자동으로 선택 실행
+
+    ....
+
+    public MainViewModel()
+        {
+            Navigator.UpdateCurrentViewModelCommand.Execute(ViewType.Home);
+        }
+
+    ....
+    ```
+* SimpleTrader.WPF / Controls / NavigationBar.xaml
+    ```js
+    // radio button에서 ISChecked true면 선택 
+    // Converter 적용
+    ....
+
+    <RadioButton Grid.Column="0" Content="Home" 
+                    IsChecked="{Binding CurrentViewModel}" // 1 
+                    Command="{Binding UpdateCurrentViewModelCommand}" 
+                    CommandParameter="{x:Static nav:ViewType.Home}" />
+    
+    ....
+    ```
+* SimpleTrader.WPF / Converters / EqualValueToParameterConverter.cs
+    ```js
+    // 2
+
+    public class EqualValueToParameterConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, 
+                                    object parameter, CultureInfo culture)
+        {
+            return value.ToString() == parameter.ToString();
+
+                // value is the CurrentViewModel on the navigator
+        }
+
+        public object ConvertBack(object value, Type targetType, 
+                                    object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+
+            // we actually don't want anything on convert back 
+            // because we never want to convert from a boolean to a view model
+            // so to fix that we're gonna set this binding as one-way
+            // so whenever we check the radio button 
+            // or whenever it gets set the false or anything it's not gonna send
+            // anything back to this current view model binding.
+        }
+    }
+    ```
+* SimpleTrader.WPF / Controls / NavigationBar.xaml
+    ```js
+    // radio button에서 ISChecked true면 선택 
+    // Converter 적용
+
+    <UserControl.Resources>
+        <converters:EqualValueToParameterConverter 
+                        x:Key="EqualValueToParameterConverter" />  // 4
+    </UserControl.Resources>
+    ....
+
+    <RadioButton Grid.Column="0" Content="Home" 
+                        IsChecked="{Binding CurrentViewModel, 
+                        Mode=OneWay,  // 6
+                        Converter={StaticResource EqualValueToParameterConverter},  // 5
+                        ConverterParameter={x:Type vm:HomeViewModel}}" // 3
+    
+    ....
+    ```

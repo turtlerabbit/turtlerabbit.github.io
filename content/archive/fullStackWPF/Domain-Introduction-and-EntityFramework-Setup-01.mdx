@@ -1,0 +1,151 @@
+---
+title: FULL STACK WFP 01 - Domain Introduction and Entity Framework Setup
+date: '2021-05-12 01'
+tag: WPF, FullStack, EntityFramework, Migrations
+---
+#
+프로젝트와 도메인을 소개하고 도메인 계층 구축을 시작하고 애플리케이션을 위한 Entity Framework를 설정한다.
+#
+### 1. Domain Introduction
+* Class Library 생성 - SimpleTrader.Domain
+* Models / User.cs, Account.cs, AssetTransaction.cs, Stock.cs
+```js
+public class User
+{
+    public int Id { get; set; }
+    public string Email { get; set; }
+    public string Username { get; set; }
+    public string Password { get; set; }
+    public DateTime DatedJoined { get; set; }
+}
+
+public class Account
+{
+    public int Id { get; set; }
+    public User AccountHolder { get; set; }
+    public double Balance { get; set; }
+    public IEnumerable<AssetTransaction> AssetTransactions { get; set; }
+
+}
+
+public class AssetTransaction
+{
+    public int Id { get; set; }
+    public Account Account { get; set; }
+    public bool IsPurchase { get; set; }
+    public Stock Stock { get; set; }
+    public int Shares { get; set; }
+    public DateTime DateProcessed { get; set; }
+}
+
+public class Stock
+{
+    public string Symbol { get; set; }
+    public double pricePerShare { get; set; }
+}
+```
+![alt](https://lh3.googleusercontent.com/5TMzsWVcP52h6HyJ_hXt6hBTKP6NEWEFCw68UGMXR57Ta_ChoYaSKgJvdHxhEq9QCZMopWVvt1j71sMywz2Dp3LeqHJELscOsp7hTabj0nyjkuqA8IMa0J-nR1TEp6Mk42HZ9Y1HWf_T4T7M64FSgWANA5I6ljZL-RMBfNmnSDkbXblpKT7z1si_zp3NzLlofx0CqMFgbkC1bc29qq_AfZlYHd1jl8nhTExW6iNRxlXRAdxR9BzFGzrbCvMcwW3hdphL7n4z4u-7do8SSKVngLKIDkVt_xuNnbfWI1yuAWzm8nyi2aFxNfdu6nmNazQ9_mUgqYdXX6PeWDM1ZKioq6dIDLQGjrFsdW01C1xna58E9y9urgBbT2XH4pYcCInMMd2v3RTP4d8pfHcmeqDISuk-XoGJdHfzDufMKAjZBnXNvTuJS0l9uOLt-G9j9nD2K0LmJ6ueNCzmy2gptc7rnDyX1UUypu92YW1k51INewVVEkPngZOEjSZyK-rm9dWWhwhu9kwj9krN6FlKzmLR4M52z_G-1lr3zq7lKTf31zUR65_4Waml21NyjA_Ttquss9KFTlwA_nd_dTvl9vgL3aOahqYBjBCLsOZj5QNGicq4PI4ggUjtlWf_olerFgIthU9BXaRdtNNh4stwL362kx88w-p2ouzIoAM3gaHwPk4gwQctG-hI0chHxjcPbrb81_5ZoRDTD9uwzODZT_drQA=w2002-h1138-no?authuser=0)
+![alt](https://lh3.googleusercontent.com/_f8yVFhqOZIcOPYFpX7iMFky2VtZnHbvZG-dcUN4HDvp-qRBVjcQkRbZXqV0fBMf2rN4eiCMDxAvDN6DraDQLKwE7byZ2mu5RkrOINqtrLIgfAtIHCuGI7rmCpbGhHWx650CBWJ0QHUWH9bTUV5HsxAXZRC5MOpIzT33-DjrfrsPDZ7ha-GZWOF1Re3bOSoD2o5gJczNeQkwPRNcgbbF3kpSlMdK5-AQp0AUDLdaf7wZoPP5G_RoB0pjkQIVMdcWQQ7oU7dazpDzNChgSLRQ2u-3APQss_aYQZ81y2-fN7RiHoShcyNLeYBAWXmT5nhM2aOgzPXYyL9gREJAXCMZxPc45C3FxxPMUzNieokVA3GAL3VT64Yy-QA9VVOJw4OkhBpFVenbABAoMYci-d_8lcxaORTgu9BodzxyJXG2F9o_gJMj5XVhzS-IjC5M3wP4mAqV4hmlLYr3rIpkvE4HwL-VqEYwqmA4UaJA4pwPCoLzsn0zjDwIJZ5a3niUJ8HuQoc15CM61yPlVQwIfGbupFWkFvSjDlos304j1c57dTesxOx1TBw4sGqoX9Lx82UY4CRItOgxpAsP_6E4W77k2_Ex9sRJxvh-pyYb14TT99m_lb77mxDFB4RrrQrKMbdiB-_ba5atkcKG0Vz9PkitaALqnp6A_8h690k0uKVenDlSbD11-ha3C425RM-J_E099Jho9Mgpuo_1u2UkGczU2A=w1654-h1207-no?authuser=0)
+
+* Services / IDataService.cs
+```js
+public interface IDataService<T>
+{
+    Task<IEnumerable<T>> GetAll();
+    Task<T> Get(int id);
+    Task<T> Create(T entity);
+    Task<T> Update(int id, T entity);
+
+    Task<bool> Delete(int id);
+}
+```
+![alt](https://lh3.googleusercontent.com/4sWgWz3CZyXgI_SCpQrN0ewp53IF_W1-8ChqCmbYi_Y2YsBdR6oR9M9iq_4xDOcNwnnQFB7dzzdvYgNKsvkncgxf9yruWZedS87cqihxhp7gJxYPeNmT2PRwhep0vhbn3s1MTmcjvEwEt0iSJu_iHLkDD3G4Qc8cFTfWhWgE-j9ZfXhgkFNN337AHyqE9RFlNsiPCxMB65cL5XXfwyiNj3uPjAqkBMwJWUXDnu5MLrqeZ_jRwdVXJgXaBQSSp5RvLZZW-VoQOYKPDNPmBTPp2rNmarrh8M3o_z9d_7jV1if3lhP-DPSfTlMqWjiDhGhBXBrYo_cpPatXqNTitjgD7lEaQoeKLnXly-sj9_UEAVcufmVUuGjpQrLonGbxhZ1VAISTnXMoLqMQv_6oBF_CyN45gZF8jXQmQQLKFGTwmisVEVKrFLarXXPgJ3wcL-9UDgQSkUFjelvNkSiCd56-nzgoBSET04rlwf5BCii9hpFgv2SViWalVvQXl523zF9KpjZXVZKqT9-TprBkyINWpRnp89GiVNi_yxx7PxY9h1Wny_NuUxm7BAD8rJxr7T0CGyLHGvAtpiiyCvjPR8TStBGVpoVND-x3Z95GdKhP0_MK030G4-A8GR-XM4aJQRU_18tEvwCSblGM2hU2Bz1QCN-gGw7Q3Ry7waZkz9cnvkhhbMwlXma4M2rr6Ldk9qNTu-uuzvO5oJtiKwYB0PCoMw=w1725-h1285-no?authuser=0)
+#
+### 2. Entity Framework Setup
+* Class Library 생성 - SimpleTrader.EntityFramework
+* NuGet - Microsoft.EntityFrameworkCore 설치
+* SimpleTraderDbContext.cs
+```js
+public class SimpleTraderDbContext : DbContext
+{
+    public DbSet<User> Users { get; set; }
+    public DbSet<Account> Accounts { get; set; }
+    public DbSet<AssetTransaction> AssetTransactions { get; set; }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        // 1. optionsBuilder.UseSqlServer을 사용하기 위해
+        // NuGet - Microsoft.EntityFrameworkCore.SqlServer 설치.
+        optionsBuilder.UseSqlServer("Server=(localdb)\\MSSQLLocalDB;Database=nameDB~~;");
+
+        base.OnConfiguring(optionsBuilder);
+    }
+}
+```
+* NuGet - Microsoft.EntityFrameworkCore.Tools : Package Manager Console 사용하기 위해
+* SimpleTrader.EntityFramework 시작 프로젝트로 설정.
+* PM> add-migration initial 실행.
+* Error - The entity type 'Stock' requires a primary key to be defined. 발생
+```js
+public class SimpleTraderDbContext : DbContext
+{
+    public DbSet<User> Users { get; set; }
+    public DbSet<Account> Accounts { get; set; }
+    public DbSet<AssetTransaction> AssetTransactions { get; set; }
+
+    // 2. Error 해결하기해 코드 추가
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AssetTransaction>().OwnsOne(a => a.Stock);
+        base.OnModelCreating(modelBuilder);
+    }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        // 1. optionsBuilder.UseSqlServer을 사용하기 위해
+        // NuGet - Microsoft.EntityFrameworkCore.SqlServer 설치.
+        optionsBuilder.UseSqlServer("Server=(localdb)\\MSSQLLocalDB;Database=nameDB~~;");
+
+        base.OnConfiguring(optionsBuilder);
+    }
+}
+```
+* PM> add-migration initial
+* PM> update-database
+```js
+Entity Framework Core Migrations
+
+// Creating a Migration
+[Command Line]
+dotnet ef migrations add <name of migration>
+[Package Manager console]
+add-migration <name of migration>
+
+// Add a Migration
+[Command Line]
+dotnet ef migrations add <name of migration>
+[Package Manager Console]
+Add-Migration <name of migration>
+
+// Removing a Migration
+[Command Line]
+dotnet ef migrations remove
+[Package Manager Console]
+remove-migration
+
+// Applying a Migration : Update
+[Command line]
+dotnet ef database update
+[Package Manager Console]
+update-database
+
+// Reversing a Migration
+// 첫 번째 마이그레이션의 이름이 "Create"이고 데이터베이스를 복원하여 
+// 후속 마이그레이션으로 인한 모든 변경 사항을 제거하려면 
+// "Create"를 update 명령에 전달한다.
+[Command line]
+dotnet ef database update Create
+[Package Manager Console]
+update-database Create
+```
+![alt](https://lh3.googleusercontent.com/kbHhpCd4k4UrRGcMyhNcujqv_OigiZJaBlbJ1M5g9kxBHIeoj5NQpCAPFujItSC6uuG7-pWekoTa8phEjm6MookZt1o974ulTBSJ7ShFka8RgO7imdAYobUByCA0gwA34_idq0aVJVKm4xl8y0SFXbNJBYsg00JkpMsB1mzopMY6t1Vx3y2tHlq0CV8symmH41J1HxWjFksqiuJMTmpfYGwAABTruO0Pee3DhloXLgnSyV_AUnRC0p22Yitt1l_pHI9snODKT0M1pQYZc5Fv5JZoQYQqlNbNa0O-MzF_oAKQo9hNMHOSTFg8_ZMxzWsMo45iZYp400ZExGpK7WuKkjPBqCNW60rewIhum25YJAo87bUrk8mIBGj6JcQhcVw7Z9JBW_F6Ti9ufoOUO40zXcX1eBax77-3z_Q_F4A2RyCmxzBTf_RLSmcLZJW4kYCOPQuJp0zXLsabaxg0WXdgEThnczbbHhaskaq5YmOMA-U-f3bTnNvhgW7ylU99HMfqjqyC-OP3xM3r8rOIGB_jHUlzNKmS2G9PHrZZd2InlvC997kjlo3JZjRUs1ag342hsC0jGvGNvCjRaEPIFQtGGplSk8mlRTmTuQmfkRC4yrNsW7s4gN_GYUbOltx_KDsORzyK1phb2ECkU4GA06D68rjHiEQGZaMMYfrqKGXVJCH3ZIt9QHHWHnTpFJG2K_n1v5eBslbNhTCMTr9ID269iA=w1453-h508-no?authuser=0)

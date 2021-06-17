@@ -15,7 +15,7 @@ class Layout extends React.Component {
       header = (
         <h1
           style={{
-            ...scale(1.3),
+            ...scale(1.18),
             marginBottom: rhythm(0.5),
             marginTop: 0,
           }}
@@ -59,8 +59,8 @@ class Layout extends React.Component {
         style={{
           marginLeft: `auto`,
           marginRight: `auto`,
-          maxWidth: rhythm(30),
-          padding: `${rhythm(1.5)} ${rhythm(3 / 4)}`,
+          maxWidth: rhythm(33),
+          padding: `${rhythm(1.5)} ${rhythm(3 / 20)}`,
         }}
       >
         {header}
@@ -69,15 +69,25 @@ class Layout extends React.Component {
         <footer>
           © {new Date().getFullYear()}, Built with
           {` `}
-          <a href="https://www.gatsbyjs.org">gatsby</a>
+          <Link style={{ boxShadow: `none`, color:`dimgray`, textDecoration: `none`,}} to={'https://www.gatsbyjs.org'}>
+            gatsby
+          </Link>
           {`, `}
-          <a href="https://www.algolia.com">algolia</a>
+          <Link style={{ boxShadow: `none`, color:`dimgray`, textDecoration: `none`,}} to={'https://www.algolia.com'}>
+          algolia
+          </Link>
           {`, `}
-          <a href="https://mdxjs.com/">mdx</a>
+          <Link style={{ boxShadow: `none`, color:`dimgray`, textDecoration: `none`,}} to={'https://mdxjs.com/'}>
+          mdx
+          </Link>
           {`, `}
-          <a href="https://github.com/kyleamathews/typography.js/">typography.js</a>
+          <Link style={{ boxShadow: `none`, color:`dimgray`, textDecoration: `none`,}} to={'https://github.com/kyleamathews/typography.js/'}>
+          typography.js
+          </Link>
           {`, `}
-          <a href="https://turtlerabbit.github.io/">github</a>
+          <Link style={{ boxShadow: `none`, color:`dimgray`, textDecoration: `none`,}} to={'https://turtlerabbit.github.io/'}>
+          github
+          </Link>
         </footer>
       </div>
     )

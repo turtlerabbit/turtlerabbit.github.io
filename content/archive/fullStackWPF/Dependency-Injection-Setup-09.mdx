@@ -1,0 +1,348 @@
+---
+title: FULL STACK WFP 09 - Dependency Injection Setup
+date: '2021-05-12 09'
+tag: WPF, FullStack, Dependency Injection, DI, singleton, scoped, transient
+---
+#
+기본 제공 종속성 주입 .NET Core package를 사용하여 종속성 주입을 설정했다.  
+종속성 주입의 이점과 서비스를 singleton, scoped 또는 transient(임시)로 등록하는 것의 차이점에 대해 설명한다. 
+또한 뷰 모델 생성을 팩토리로 리팩터링하여 애플리케이션의 뷰 모델에 대한 모든 종속성이 종속성 주입 컨테이너에서 해결되도록한다.
+#
+### 1. Setup dependency injection.
+* We want the dependency injection container to automatically create all the services.   
+    - Give us services with dependencies already passed in.   
+    - Define all application dependencies in one isolated plasce. (the dependecny injection container)   
+* SimpleTrader.WPF / App.xaml.cs
+    ```js
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        // Don't pass around your IServiceProvider!
+        IServiceProvider serviceProvider = CreateServiceProvider();
+
+        Window window = new MainWindow();
+        Window window = serviceProvider.GetRequiredService<MainViewModel>();
+        window.Show();
+
+        base.OnStartup(e); 
+    }
+
+    private IServiceProvider CreateServiceProvider()
+    {
+        IServiceCollection services = new ServiceCollection();
+
+        // 1. Singleton - one instance per application
+        // 2. Transient - different instance everytime
+        // 3. Scoped - one instance per "scope"
+
+        services.AddSingleton<SimpleTraderDbContextFactory>(); 
+        // we do not depend on that interface anywhere.
+        services.AddSingleton<IDataService<Account>, AccountDataService>();
+        services.AddSingleton<IStockPriceService, StockPriceService>();
+        services.AddSingleton<IBuyStockService, BuyStockService>();
+
+        services.AddScoped<INavigator, Navigator>();  // MainViewModel.cs 수정
+        services.AddScoped<MainViewModel>();
+
+        return services.BuildServiceProvider();
+    }
+    ```
+* SimpleTrader.WPF / ViewModels / MainViewModel.cs
+    ```js
+    public class MainViewModel : ViewModelBase
+    {
+        public INavigator Navigator { get; set; }
+
+        public MainViewModel(INavigator navigator)
+        {
+            Navigator = navigator;
+
+            Navigator.UpdateCurrentViewModelCommand.Execute(ViewType.Home);
+        }
+    }
+    ```
+* SimpleTrader.WPF / ViewModels / Factories / ISimpleTraderViewModelAbstractFactory.cs
+    ```js
+    public interface ISimpleTraderViewModelAbstractFactory
+    {
+        ViewModelBase CreateViewModel(ViewType viewType);
+    }
+    ```
+* SimpleTrader.WPF / ViewModels / Factories / SimpleTraderViewModelAbstractFactory.cs
+    ```js
+    public class SimpleTraderViewModelAbstractFactory : 
+        ISimpleTraderViewModelAbstractFactory
+    {
+        public ViewModelBase CreateViewModel(ViewType viewType)
+        {
+            switch (viewType)
+            {
+                case ViewType.Home:
+                    return new HomeViewModel(
+                        MajorIndexListingViewModel.LoadMajorIndexViewModel(
+                            new MajorIndexService()));
+                case ViewType.Portfolio:
+                    return new PortfolioViewModel();
+                default:
+                    throw new ArgumentException(
+                        "The ViewType does not have a ViewModel.", "viewType");
+            }
+        }
+    }
+    ```
+* SimpleTrader.WPF / ViewModels / Factories / ISimpleTraderViewModelFactory.cs
+    ```js
+    public interface ISimpleTraderViewModelFactory<T> where T : ViewModelBase
+    {
+        T CreateViewModel();
+    }
+    ```
+* SimpleTrader.WPF / ViewModels / Factories / HomeViewModelFactory.cs
+    ```js
+    public class HomeViewModelFactory : ISimpleTraderViewModelFactory<HomeViewModel>
+    {
+        private readonly ISimpleTraderViewModelFactory<MajorIndexListingViewModel> 
+            _majorIndexViewModelFactory;
+
+        public HomeViewModelFactory(
+            ISimpleTraderViewModelFactory<MajorIndexListingViewModel> 
+                majorIndexViewModelFactory)
+        {
+            _majorIndexViewModelFactory = majorIndexViewModelFactory;
+        }
+
+        public HomeViewModel CreateViewModel()
+        {
+            return new HomeViewModel(_majorIndexViewModelFactory.CreateViewModel());
+        }
+    }
+    ```
+* SimpleTrader.WPF / ViewModels / Factories / MajorIndexListingViewModelFactory.cs
+    ```js
+    public class MajorIndexListingViewModelFactory : 
+        ISimpleTraderViewModelFactory<MajorIndexListingViewModel>
+    {
+        private readonly IMajorIndexService _majorIndexService;
+
+        public MajorIndexListingViewModelFactory(IMajorIndexService majorIndexService)
+        {
+            _majorIndexService = majorIndexService;
+        }
+
+        public MajorIndexListingViewModel CreateViewModel()
+        {
+            return MajorIndexListingViewModel.LoadMajorIndexViewModel(_majorIndexService);
+        }
+    }
+    ```
+* SimpleTrader.WPF / ViewModels / Factories / SimpleTraderViewModelAbstractFactory.cs
+    ```js
+    public class SimpleTraderViewModelAbstractFactory : 
+        ISimpleTraderViewModelAbstractFactory
+    {
+        private readonly ISimpleTraderViewModelFactory<HomeViewModel> 
+            _homeViewModelFactory;
+        private readonly ISimpleTraderViewModelFactory<PortfolioViewModel> 
+            _portfolioViewModelFactory;
+
+        public SimpleTraderViewModelAbstractFactory(
+            ISimpleTraderViewModelFactory<HomeViewModel> homeViewModelFactory, 
+            ISimpleTraderViewModelFactory<PortfolioViewModel> portfolioViewModelFactory)
+        {
+            _homeViewModelFactory = homeViewModelFactory;
+            _portfolioViewModelFactory = portfolioViewModelFactory;
+        }
+
+        public ViewModelBase CreateViewModel(ViewType viewType)
+        {
+            switch (viewType)
+            {
+                case ViewType.Home:
+                    return _homeViewModelFactory.CreateViewModel();
+                case ViewType.Portfolio:
+                    return _portfolioViewModelFactory.CreateViewModel();
+                default:
+                    throw new ArgumentException(
+                        "The ViewType does not have a ViewModel.", "viewType");
+            }
+        }
+    }
+    ```
+* SimpleTrader.WPF / ViewModels / Factories / PortfolioViewModelFactory.cs
+    ```js
+    public class PortfolioViewModelFactory : 
+        ISimpleTraderViewModelFactory<PortfolioViewModel>
+    {
+        public PortfolioViewModel CreateViewModel()
+        {
+            return new PortfolioViewModel();
+        }
+    }
+    ```
+* SimpleTrader.WPF / App.xaml.cs
+    ```js
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        // Don't pass around your IServiceProvider!
+        IServiceProvider serviceProvider = CreateServiceProvider();
+
+        Window window = new MainWindow();
+        Window window = serviceProvider.GetRequiredService<MainViewModel>();
+        window.Show();
+
+        base.OnStartup(e); 
+    }
+
+    private IServiceProvider CreateServiceProvider()
+    {
+        IServiceCollection services = new ServiceCollection();
+
+        // 1. Singleton - one instance per application
+        // 2. Transient - different instance everytime
+        // 3. Scoped - one instance per "scope"
+
+        services.AddSingleton<SimpleTraderDbContextFactory>(); 
+        // we do not depend on that interface anywhere.
+        services.AddSingleton<IDataService<Account>, AccountDataService>();
+        services.AddSingleton<IStockPriceService, StockPriceService>();
+        services.AddSingleton<IBuyStockService, BuyStockService>();
+
+        // 추가
+        services.AddSingleton<IMajorIndexService, MajorIndexService>();
+
+        services.AddSingleton<ISimpleTraderViewModelAbstractFactory, 
+            SimpleTraderViewModelAbstractFactory>();
+        services.AddSingleton<ISimpleTraderViewModelFactory<HomeViewModel>, 
+            HomeViewModelFactory>();
+        services.AddSingleton<ISimpleTraderViewModelFactory<PortfolioViewModel>, 
+            PortfolioViewModelFactory>();
+        services.AddSingleton<ISimpleTraderViewModelFactory<
+            MajorIndexListingViewModel>, MajorIndexListingViewModelFactory>();
+        // 추가 완료
+
+        services.AddScoped<INavigator, Navigator>();  // MainViewModel.cs 수정
+        services.AddScoped<MainViewModel>();
+
+        return services.BuildServiceProvider();
+    }
+    ```
+* SimpleTrader.WPF / Commands / UpdateCurrentViewModelCommand.cs
+    ```js
+    public class UpdateCurrentViewModelCommand : ICommand
+    {
+        public event EventHandler CanExecuteChanged;
+
+        private readonly INavigator _navigator;
+        private readonly ISimpleTraderViewModelAbstractFactory _viewModelFactory;
+
+        public UpdateCurrentViewModelCommand(INavigator navigator, 
+            ISimpleTraderViewModelAbstractFactory viewModelFactory)
+        {
+            _navigator = navigator;
+            _viewModelFactory = viewModelFactory;
+        }
+
+        public bool CanExecute(object parameter)
+        {
+            return true;
+        }
+
+        public void Execute(object parameter)
+        {
+            if (parameter is ViewType)
+            {
+                ViewType viewType = (ViewType)parameter;
+
+                _navigator.CurrentViewModel = _viewModelFactory.CreateViewModel(viewType);
+            }
+        }
+    }
+    ```
+* SimpleTrader.WPF / State / Navigators
+    ```js
+    public class Navigator : ObservableObject, INavigator
+    {
+        private ViewModelBase _currentViewModel;
+        public ViewModelBase CurrentViewModel
+        {
+            get
+            {
+                return _currentViewModel;
+            }
+            set
+            {
+                _currentViewModel = value;
+                OnPropertyChanged(nameof(CurrentViewModel));
+            }
+        }
+
+        public ICommand UpdateCurrentViewModelCommand { get; set; }
+
+        public Navigator(ISimpleTraderViewModelAbstractFactory viewModelFactory)
+        {
+            UpdateCurrentViewModelCommand = 
+                new UpdateCurrentViewModelCommand(this, viewModelFactory);
+        }
+    }
+    ```
+* SimpleTrader.WPF / MainWindow.xaml.cs
+    ```js
+    public partial class MainWindow : Window
+    {
+        public MainWindow(object dataContext)
+        {
+            InitializeComponent();
+
+            DataContext = dataContext;
+        }
+    }
+    ``` 
+* SimpleTrader.WPF / App.xaml.cs
+    ```js
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        // Don't pass around your IServiceProvider!
+        IServiceProvider serviceProvider = CreateServiceProvider();
+
+        // 수정 완료
+        Window window = serviceProvider.GetRequiredService<MainWindow>();
+        window.Show();
+
+        base.OnStartup(e); 
+    }
+
+    private IServiceProvider CreateServiceProvider()
+    {
+        IServiceCollection services = new ServiceCollection();
+
+        // 1. Singleton - one instance per application
+        // 2. Transient - different instance everytime
+        // 3. Scoped - one instance per "scope"
+
+        services.AddSingleton<SimpleTraderDbContextFactory>(); 
+        // we do not depend on that interface anywhere.
+        services.AddSingleton<IDataService<Account>, AccountDataService>();
+        services.AddSingleton<IStockPriceService, StockPriceService>();
+        services.AddSingleton<IBuyStockService, BuyStockService>();
+        services.AddSingleton<IMajorIndexService, MajorIndexService>();
+
+        services.AddSingleton<ISimpleTraderViewModelAbstractFactory, 
+            SimpleTraderViewModelAbstractFactory>();
+        services.AddSingleton<ISimpleTraderViewModelFactory<HomeViewModel>, 
+            HomeViewModelFactory>();
+        services.AddSingleton<ISimpleTraderViewModelFactory<PortfolioViewModel>, 
+            PortfolioViewModelFactory>();
+        services.AddSingleton<ISimpleTraderViewModelFactory<
+            MajorIndexListingViewModel>, MajorIndexListingViewModelFactory>();
+
+        services.AddScoped<INavigator, Navigator>(); 
+        services.AddScoped<MainViewModel>();
+
+        // 수정
+        // We can't just resolve the MainViewModel automatically
+        // because the MainWindow constructor takes an "object"
+        services.AddScoped<MainWindow>(
+            s => new MainWindow(s.GetRequiredService<MainViewModel>()));
+
+        return services.BuildServiceProvider();
+    }
+    ```

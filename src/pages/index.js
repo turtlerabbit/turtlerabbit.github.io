@@ -1,7 +1,7 @@
 import React from 'react'
 import { Link, graphql } from 'gatsby'
 
-import Layout from '../components/Layout'
+import Layout from '../components/layout'
 import { rhythm } from '../utils/typography'
 
 class IndexPage extends React.Component {
@@ -21,7 +21,7 @@ class IndexPage extends React.Component {
                   marginBottom: rhythm(1 / 4),
                 }}
               >
-                <Link style={{ boxShadow: `none`, color:`dodgerblue`}} to={node.fields.slug}>
+                <Link style={{ boxShadow: `none`, color:`dodgerblue`, textDecoration: `none`,}} to={node.fields.slug}>
                   {title}
                 </Link>
               </h3>
@@ -39,7 +39,7 @@ export default IndexPage
 
 export const pageQuery = graphql`
 query {
-  allMdx(sort: {fields: frontmatter___date, order: DESC}) {
+  allMdx(sort: {fields: frontmatter___date, order: DESC}, limit: 4) {
     edges {
       node {
         excerpt

@@ -1,0 +1,128 @@
+---
+title: C# 9.0
+date: '2021-01-09 05'
+tag: csharp, C#, tutorial, 9.0, 
+---
+
+```js
+//System.Console.WriteLine("Hello World!"); // cw tap tap
+#region  1.Top Level 구문
+//using static System.Console;
+//WriteLine("Hello World!");
+
+// 탑레벨 스테이트먼트 구문에 의해서 클래스와 메인 메서드가 없이 
+// 하나의 프로젝트에 하나의 cs파일이다. 그러면
+// 이자체를 하나의 메인메서드의 영역처럼 마치 자바스크립트나 파이썬처럼
+// 현재 파일이 그대로 실행된다.
+// 여러개의 cs 파일이 있을 경우 어느것이 시작개체인지를 정해주는게 좋다.
+// 메인매서드를 두는게 좋다.
+// 탑레벨 스테이트먼트의 목적은 학습할때 가장 효과가 좋다.
+#endregion 
+
+
+using System.Threading.Tasks;
+System.Console.WriteLine($"Hello {args[0]}, Happy Codding!!!"); // 10.속성 -> 디버그
+await Task.Delay(1000); // 11.비동기(await) 실행
+// 12.터미널 기반 처리  => dotnet run -- "c# 9.0"
+
+var sponsor = new Sponsor { Id = 1, DisplayName = "Red" }; // 2.Sponsor 개체 하나 만듬.
+// 6.보통 한번 초기화하면 데이터는 Imutable하는게 좋다.
+//sponsor.DisplayName = "RedPlus"; // 7.mutable(변경가능하다) => 9.init => imutable
+
+#region 2. c# 7.0 8.0의 inline function으로 나타냄
+// 5. DisplayDate 메서드에 sponsor 개체를 넣어준다.
+DisplayDate(sponsor);
+
+// 4. 3번의 출력기능을 메서드로 만든다.
+static void DisplayDate(Sponsor sponsor) =>
+    System.Console.WriteLine($"{sponsor.Id} - {sponsor.DisplayName}");
+
+// 3.Sponsor 개체의 Id와 DisplayName을 화면에 출력함.
+//System.Console.WriteLine($"{sponsor.Id} - {sponsor.DisplayName}");
+#endregion
+
+
+var subscribe_ex = new Subscriber_ex { Title = "Visual", Duration = 2 }; //14. subscribe 개체 만듬.
+System.Console.WriteLine(subscribe_ex);
+
+var subscriber = new Subscriber("visual", 2, true);
+var vip = subscriber with { Title = "VIP" }; // 16.imutable => with => mutable
+System.Console.WriteLine(vip);
+
+var (title, duration, isAvariable) = subscriber; // 
+// 17.레코드에서는 가능하지만 
+//특정한 클래스에서 사용할려면 Deconstruct()를 내부적으로 구현해서
+//어떤 값을 튜플타입으로 반한할것이냐를 직접 구현해줘야한다.
+System.Console.WriteLine($"{title} - {duration} - {isAvariable}"); // 구조파괴할당을 할수 있다.
+
+
+#region 5. Pattern Matching 8.0 + 9.0
+//Subscriber membership = new Visual("VIP", 1, true); //[C] // membership에는 Subscriber와 Visual이 담겨져 있다 (총 6개)
+//Subscriber membership = new Studio("Sponsor", 2, true); //[B]
+Subscriber membership = new Code("Chamption", 2, true); //[A]
+
+//19. c# 8.0에서 소개된 switch 표현식
+var membershipDescription = membership switch // 맴버쉽이 스위치 표현식에 의해서 _의 결과값을 받는다.
+{
+    // Pattern => Expression
+    //Code and (var t, var d, var i) => $"{t} - {d} - {i}",
+    ("Chamption", var d, var i) => $"Champion - {d} - {i}",
+
+    //[A] Champion(Code)
+    Code c when c.Duration > 1 => $"{c.Title} Membership > 1",
+    Code c => $"{c.Title} Membership",
+
+    //[B] Sponsor(studio)
+    (Code and (_, > 1, true)) or (Studio and { Duration: 2 }) => "Multi", //[6] Parenthesized Pattern
+    Studio and (_, > 1, _) => "Sponsor Membership > 1", //[5] Relational Pattern
+    Studio => "Sponsor Membership", //[2] Type Pattern
+
+    //[C] VIP(Visual)
+    Visual and { Title: "VIP" } => "VIP Membership", // [3] Property Pattern
+    Visual and (_, 1, true) => "Welcom VIP", // [3] Positional Pattern
+    not Visual => "No Problem", // [2] Type Pattern + not
+    _ => "No Membership" // [1] Discard == switch 문의 Default Case
+};
+System.Console.WriteLine(membershipDescription);
+#endregion
+
+
+#region 3.Init Accessors : 변경할 수 없는 속성으로 만든다.
+class Sponsor
+{ 
+    //public int Id { get; set; }
+    //public string DisplayName { get; set; }
+    public int Id { get; init; }
+    public string DisplayName { get; init; } // 8.init 접근자로 초기화전용 세터를 만든다.
+} // 1.Sponsor 구조체 하나 만듬.
+#endregion
+
+
+#region 4.Records
+record Subscriber_ex
+{
+    public string Title { get; init; }
+    public int Duration { get; init; }
+} // 13. Subscribe record 하나 만듬. 이런 형태는 사용 하지 말자.
+
+record Subscriber(string Title, int Duration, bool IsAvariable); // 15. Syntax Sugar : 문 대신 식(간편화)
+record Visual(string Title, int Duration, bool IsAvariable) 
+    : Subscriber(Title, Duration, IsAvariable); // 18. 레코드 상속
+record Studio : Subscriber
+{
+    public Studio(string Title, int Duration, bool IsAvariable) :
+        base(Title, Duration, IsAvariable)
+    { 
+    }
+} // 18. 레코드 상속
+record Code : Subscriber
+{
+    public Code(string Title, int Duration, bool IsAvariable) :
+        base(Title, Duration, IsAvariable)
+    {
+    }
+} // 18. 레코드 상속
+#endregion
+```
+#
+[source](https://github.com/ledpink/CSharpVersion)

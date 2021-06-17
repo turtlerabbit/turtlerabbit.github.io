@@ -1,0 +1,60 @@
+---
+title: Dynamic Data - Switch
+date: '2021-01-12 05'
+tag: DynamicData, Switch()
+---
+#
+### 1. Switch
+* 다른 데이터 소스 간 전환
+* 데이터의 전환은 `IObservable<IChangeSet<T>>` or `IObservable<IObservableList<T>>`에서 작동한다.  
+* The same concept applies to the `ObservableCache`.
+```js
+public IObservableList<int> DataSource { get; }
+
+public SwitchDataSource(IObservableList<int> sourceA, IObservableList<int> sourceB)
+{
+    DataSource = this
+        .WhenValueChanged(@this => @this.Option)
+        .Select(opt => opt == SwitchDataSoruceOption.SourceA ? sourceA : sourceB)
+        .Switch()  // this is dynamic data overload of Switch()
+        .AsObservableList();
+
+    this.cleanUp = DataSource;
+}
+
+#
+
+public class SourceList<T> : ISourceList<T>, IObservableList<T>, IDisposable
+public class SourceCache<TObject, TKey> : ISourceCache<TObject, TKey>, 
+    IObservableCache<TObject, TKey>, IConnectableCache<TObject, TKey>, IDisposable 
+    where TKey : notnull
+
+#
+
+using (var listA = new SourceList<int>())
+using (var listB = new SourceList<int>())
+using (var sut = new SwitchDataSource.SwitchDataSource(listA, listB))
+{
+    var oddNumbers = Enumerable
+        .Range(1, 10000)
+        .Where(i => i % 2 == 1).ToArray();
+    var evenNumbers = Enumerable
+        .Range(1, 10000)
+        .Where(i => i % 2 == 2).ToArray();
+
+    listA.AddRange(oddNumbers);
+    listB.AddRange(evenNumbers);
+
+    sut.Option = SwitchDataSource.SwitchDataSoruceOption.SourceB;
+    foreach (var item in sut.DataSource.Items)
+    {
+        Console.WriteLine(item);  // evenNumbers
+    }
+
+    sut.Option = SwitchDataSource.SwitchDataSoruceOption.SourceA;
+    foreach (var item in sut.DataSource.Items)
+    {
+        Console.WriteLine(item);  // oddNumbers
+    }
+}
+```

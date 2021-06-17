@@ -1,0 +1,207 @@
+---
+title: FULL STACK WFP 02 - Entity Framework CRUD
+date: '2021-05-12 02'
+tag: WPF, FullStack, ReFactory, DbContext
+---
+#
+SimpleTraderDbContext를 약간 리팩터링하고 SimpleTraderDbContext를 인스턴스화하기위한 팩토리 클래스를 만든다. 
+그런 다음 파트 FULL STACK WFP 01의 Entity Framework 설정을 사용하여 애플리케이션에 대한 Data Service classes 빌드를 시작한다.
+#
+### 1. refactor the SimpleTraderDbContext a tad
+* Class Library : SimpleTrader.EntityFramework
+* SimpleTraderDbContext.cs : 리팩토링 작업 시작
+```js
+public class SimpleTraderDbContext : DbContext
+{
+    public DbSet<User> Users { get; set; }
+    public DbSet<Account> Accounts { get; set; }
+    public DbSet<AssetTransaction> AssetTransactions { get; set; }
+
+    // 2. Error 해결하기해 코드 추가
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AssetTransaction>().OwnsOne(a => a.Stock);
+        base.OnModelCreating(modelBuilder);
+    }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        // 1. optionsBuilder.UseSqlServer을 사용하기 위해
+        // NuGet - Microsoft.EntityFrameworkCore.SqlServer 설치.
+        optionsBuilder.UseSqlServer("Server=(localdb)\\MSSQLLocalDB;Database=nameDB~~;");
+
+        base.OnConfiguring(optionsBuilder);
+    }
+}
+```
+* Class Library : SimpleTrader.EntityFramework
+* SimpleTraderDbContext.cs : 리팩토링 작업 완료
+```js
+public class SimpleTraderDbContext : DbContext
+{
+    public DbSet<User> Users { get; set; }
+    public DbSet<Account> Accounts { get; set; }
+    public DbSet<AssetTransaction> AssetTransactions { get; set; }
+    public SimpleTraderDbContext(DbContextOptions options) : base(options) { }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AssetTransaction>().OwnsOne(a => a.Stock);
+        base.OnModelCreating(modelBuilder);
+    }        
+}
+```
+* Class Library : SimpleTrader.EntityFramework
+* SimpleTraderDbContextFactory.cs : SimpleTraderDbContext를 인스턴스화하기위한 팩토리 클래스를 만든다.
+```js
+// IDesignTimeDbContextFactory는
+// 파생 된 Microsoft.EntityFrameworkCore.DbContext 인스턴스를 만들기위한 팩토리다.
+
+public class SimpleTraderDbContextFactory : 
+                IDesignTimeDbContextFactory<SimpleTraderDbContext>
+{
+    public SimpleTraderDbContext CreateDbContext(string[] args = null)
+    {
+        var options = new DbContextOptionsBuilder<SimpleTraderDbContext>();
+        options.UseSqlServer("Server=(localdb)\\MSSQLLocalDB;Database=nameDB~~;");
+
+        return new SimpleTraderDbContext(options.Options);
+    }
+}
+
+// 결국
+// SimpleTraderDbContext.OnConfiguring(optionsBuilder);
+// 리팩토링 작업으로 
+// SimpleTraderDbContextFactory.CreateDbContext();
+```
+#
+### 2. building out data service classes
+* Class Library : SimpleTrader.EntityFramework
+* Services / GenericDataServices.cs
+```js
+public class GenericDataServices<T> : IDataService<T> where T : DomainObject
+{
+    private readonly SimpleTraderDbContextFactory _contextFactory;
+
+    public GenericDataServices(SimpleTraderDbContextFactory contextFactory)
+    {
+        _contextFactory = contextFactory;
+    }
+
+    public async Task<T> Create(T entity)
+    {
+        using(SimpleTraderDbContext context = _contextFactory.CreateDbContext())
+        {
+            EntityEntry<T> createdResult = await context.Set<T>().AddAsync(entity);
+            await context.SaveChangesAsync();
+
+            return createdResult.Entity;
+        }
+    }
+
+    public async Task<bool> Delete(int id)
+    {
+        using (SimpleTraderDbContext context = _contextFactory.CreateDbContext())
+        {
+            T entity = await context.Set<T>().FirstOrDefaultAsync((e) => e.Id == id);
+                // T type을 Id가 공통으로 들어간 타입으로 강제화 하기 => DomainObject.cs
+            context.Set<T>().Remove(entity);
+            await context.SaveChangesAsync();
+
+            return true;
+        }
+    }
+
+    public async Task<T> Get(int id)
+    {
+        using (SimpleTraderDbContext context = _contextFactory.CreateDbContext())
+        {
+            T entity = await context.Set<T>().FirstOrDefaultAsync((e) => e.Id == id);
+
+            return entity;
+        }
+    }
+
+    public async Task<IEnumerable<T>> GetAll()
+    {
+        using (SimpleTraderDbContext context = _contextFactory.CreateDbContext())
+        {
+            IEnumerable<T> entities = await context.Set<T>().ToListAsync();
+
+            return entities;
+        }
+    }
+
+    public async Task<T> Update(int id, T entity)
+    {
+        using (SimpleTraderDbContext context = _contextFactory.CreateDbContext())
+        {
+            entity.Id = id;
+
+            context.Set<T>().Update(entity);
+            await context.SaveChangesAsync();
+
+            return entity;
+        }
+    }
+}
+```
+* Class Library : SimpleTrader.Domain
+* Models / DomainObject.cs
+```js
+// public class GenericDataServices<T> : IDataService<T> where T : DomainObject
+
+public class DomainObject
+{
+    public int Id { get; set; }
+}
+
+#
+
+public class Account : DomainObject
+{
+    public User AccountHolder { get; set; }
+    public double Balance { get; set; }
+    public IEnumerable<AssetTransaction> AssetTransactions { get; set; }
+
+}
+
+#
+
+public class AssetTransaction : DomainObject
+{
+    public Account Account { get; set; }
+    public bool IsPurchase { get; set; }
+    public Stock Stock { get; set; }
+    public int Shares { get; set; }
+    public DateTime DateProcessed { get; set; }
+}
+
+#
+
+public class User : DomainObject
+{
+    public string Email { get; set; }
+    public string Username { get; set; }
+    public string Password { get; set; }
+    public DateTime DatedJoined { get; set; }
+}
+```
+#
+### 3. Testing
+* Class Library : ConsoleApp1
+* Services / Program.cs
+```js
+IDataService<User> userServices = 
+        new GenericDataServices<User>(new SimpleTraderDbContextFactory());
+
+userServices.Create(new User { Username = "Test" }).Wait();
+
+Console.WriteLine(userServices.GetAll().Result.Count());
+
+Console.WriteLine(userServices.Get(1).Result);
+
+Console.WriteLine(userServices.Update(1, new User() { Username = "TestUser" }).Result);
+
+Console.WriteLine(userServices.Delete(1).Result);
+```

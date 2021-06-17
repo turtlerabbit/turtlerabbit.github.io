@@ -1,0 +1,29 @@
+---
+title: Dynamic Data - Snippets
+date: '2031-01-13 02'
+tag: DynamicData, AutoRefresh, Aggregation, Creation, Filtering, Grouping, Inspect Collection, Sorting, Switch, Transform, Testing 
+---
+
+|Topic|Link|Description|
+|:-:|:-:|:-:|
+|[AutoRefresh](https://turtlerabbit.github.io/dynamicData/DynamicData-AutoRefresh/)|AutoRefreshForPropertyChanges.cs|How to force cache operators to recalulate when using mutable objects|
+|[Aggregation](https://turtlerabbit.github.io/dynamicData/DynamicData-Aggregation/)|Aggregations.cs|Dynamically aggregrate items in a data source|
+|[Creation](https://turtlerabbit.github.io/dynamicData/DynamicData-Creation/)|ChangeSetCreation.cs|Create list and cache using first class observables|
+|[Filtering](https://turtlerabbit.github.io/dynamicData/DynamicData-Filtering/)|StaticFilter.cs|Filter a data source using a static predicate|
+||DynamicFilter.cs|Create and apply an observable predicate|
+||ExternalSourceFilter.cs|Create an observable predicate from another data source|
+||PropertyFilter.cs|Filter on a property which implements INotifyPropertyChanged|
+|[Grouping](https://turtlerabbit.github.io/dynamicData/DynamicData-Grouping/)|CustomTotalRows.cs|Illustrate how grouping can be used for custom aggregation|
+||XamarinFormsGrouping.cs|Bespoke grouping with Xamarin Forms|
+||GroupAndMonitorPropertyChanges.cs|Group on the first letter of a property and update grouping when the property changes|
+|[Inspect Collection](https://turtlerabbit.github.io/dynamicData/DynamicData-InspectCollection/)|InspectCollection.cs|Produce an observable based on the contents of the datasource|
+||InspectCollectionWithPropertyChanges.cs|Produce an observable based on the contents of the data source, which also fires when a specified property changes|
+||InspectCollectionWithObservable.cs|Produce an observable based on the contents of the data source, whose values are supplied by an observable on each item in the collection|
+||MonitorSelectedItems.cs|Monitor a collection of items which have an IsSelected property and produce observables based on selection|
+|[Sorting](https://turtlerabbit.github.io/dynamicData/DynamicData-Sorting/)|	ChangeComparer.cs|How to dynamically sort a collection using an observable comparer|
+||CustomBinding.cs|Customise binding behaviour for a sorted data source|
+|[Switch](https://turtlerabbit.github.io/dynamicData/DynamicData-Switch/)|SwitchDataSource.cs|Toggle between different data sources|
+|[Transform](https://turtlerabbit.github.io/dynamicData/DynamicData-Transform/)|	FlattenNestedObservableCollection.cs|Flatten nested observable collections into an observable data source|
+|[Testing](https://turtlerabbit.github.io/dynamicData/DynamicData-Testing)|ViewModel.cs|Illustrates how to test a view model when using dynamic data|
+#
+[참고](https://github.com/RolandPheasant/DynamicData.Snippets)

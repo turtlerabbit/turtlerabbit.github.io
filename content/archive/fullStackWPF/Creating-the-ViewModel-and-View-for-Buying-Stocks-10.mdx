@@ -1,0 +1,408 @@
+---
+title: FULL STACK WFP 10 - Creating the ViewModel and View for Buying Stocks
+date: '2021-05-12 10'
+tag: WPF, FullStack, State
+---
+#
+시리즈의 앞부분에 있는 BuyStockService를 사용하여 BuyViewModel 및 BuyView를 만든다.  
+BuyViewModel은 애플리케이션 전체에서 상태가 유지되기 때문에 다른 뷰 모델과 다르다.  
+BuyViewModel 및 BuyView에 기본 기능을 추가했지만 뷰 모델에는 stock 정보를 얻기위한 새로운 서비스가 필요하며 뷰를 개선해야한다.
+# 
+### 1. Create the BuyViewModel and BuyView
+* SimpleTrader.WPF / ViewModels / BuyViewModel.cs
+    ```js
+    public class BuyViewModel : ViewModelBase
+    {
+    }
+    ```
+* SimpleTrader.WPF / Views / BuyView.xaml
+    ```js
+    <Grid>
+        <TextBlock Text="Buy Stocks" />
+    </Grid>
+    ```
+* SimpleTrader.WPF / App.xaml
+    ```js
+    <ResourceDictionary>
+            ...
+
+            <DataTemplate DataType="{x:Type viewmodels:BuyViewModel}">
+                <views:BuyView />
+            </DataTemplate>
+        </ResourceDictionary>
+    ```
+* SimpleTrader.WPF / ViewModels / Factories / SimpleTraderViewModelAbstractFactory.cs
+    ```js
+    switch (viewType)
+    {
+        case ViewType.Home:
+            return _homeViewModelFactory.CreateViewModel();
+        case ViewType.Portfolio:
+            return _portfolioViewModelFactory.CreateViewModel();
+            // 추가
+        case ViewType.Buy:
+            return new BuyViewModel();
+        ...
+    }
+    ```
+* SimpleTrader.WPF / State / Navigators / INavigator.cs
+    ```js
+    public enum ViewType
+    {
+        Home,
+        Portfolio,
+        Buy
+    }
+    ```
+* SimpleTrader.WPF / Controls / NavigationBar.xaml
+    ```js
+    ...
+    <RadioButton Grid.Column="2" Content="Buy"
+                Command="{Binding UpdateCurrentViewModelCommand}"
+                IsChecked="{Binding CurrentViewModel, Mode=OneWay,
+                            Converter={StaticResource EqualValueToParameterConverter},
+                            ConverterParameter={x:Type vm:BuyViewModel}}"
+                CommandParameter="{x:Static nav:ViewType.Buy}" />
+    <RadioButton Grid.Column="3" Content="Sell" />
+    ```
+#
+### 2. BuyViewModel's state is persisted throughout the application
+* BuyViewModel은 모든 정보를 잃어 버릴 필요가 없기 때문에 기본적으로 모든 상태를 유지 한다.  
+다른 view에서 전환해서 다시 돌아 왔을 때 BuyViewModel은 모든 것이 여전히 존재하므로 실제로  
+factory를 만들지 않고 실제로 생성자(constructor)를 통해 뷰 모델을 전달하고 이 뷰 모델은 새 상태를 만들지 않을 모든 상태를 유지한다.  
+BuyViewModel은 기본적으로 애플리케이션 기간 동안 동일한 인스턴스가 될 것이다.
+그래서 해야 할 일은 종속성 주입 컨테이너에 모델을 등록해야한다.
+* SimpleTrader.WPF / ViewModels / Factories / SimpleTraderViewModelAbstractFactory.cs
+    ```js
+    switch (viewType)
+    {
+        case ViewType.Home:
+            return _homeViewModelFactory.CreateViewModel();
+        case ViewType.Portfolio:
+            return _portfolioViewModelFactory.CreateViewModel();
+            // 추가
+        case ViewType.Buy:
+            return _buyViewModel;
+        ...
+    }
+    ```
+* SimpleTrader.WPF / App.xaml.cs
+    ```js
+    ...
+    services.AddScoped<INavigator, Navigator>();
+    services.AddScoped<MainViewModel>();
+    // 추가
+    services.AddScoped<BuyViewModel>();
+    ...
+    ```
+* SimpleTrader.WPF / ViewModels / Factories / RootSimpleTraderViewModelFactory.cs
+    ```js
+    // 파일명 변경 : RootSimpleTraderViewModelFactory : IRootSimpleTraderViewModelFactory
+
+    public class RootSimpleTraderViewModelFactory : IRootSimpleTraderViewModelFactory
+    {
+        private readonly ISimpleTraderViewModelFactory<HomeViewModel> 
+            _homeViewModelFactory;
+        private readonly ISimpleTraderViewModelFactory<PortfolioViewModel> 
+            _portfolioViewModelFactory;
+        private readonly BuyViewModel _buyViewModel;
+
+        public RootSimpleTraderViewModelFactory(
+            ISimpleTraderViewModelFactory<HomeViewModel> homeViewModelFactory, 
+            ISimpleTraderViewModelFactory<PortfolioViewModel> portfolioViewModelFactory,
+            BuyViewModel buyViewModel)
+        {
+            _homeViewModelFactory = homeViewModelFactory;
+            _portfolioViewModelFactory = portfolioViewModelFactory;
+            _buyViewModel = buyViewModel;
+        }
+
+        public ViewModelBase CreateViewModel(ViewType viewType)
+        {
+            switch (viewType)
+            {
+                case ViewType.Home:
+                    return _homeViewModelFactory.CreateViewModel();
+                case ViewType.Portfolio:
+                    return _portfolioViewModelFactory.CreateViewModel();
+                case ViewType.Buy:
+                    return _buyViewModel;
+                default:
+                    throw new ArgumentException("
+                        The ViewType does not have a ViewModel.", "viewType");
+            }
+        }
+    ```
+#
+### 3. Add basic functionality to the BuyViewModel and BuyView
+* SimpleTrader.WPF / Views / BuyView.xaml
+    ```js
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="auto" />
+        </Grid.RowDefinitions>
+
+        <WrapPanel Grid.Row="0" HorizontalAlignment="Center">
+            <TextBox Text="" /> // BuyViewModel의 Symbol
+            <Button Content="Search" Command="" />
+        </WrapPanel>
+    ```
+* SimpleTrader.WPF / ViewModels / BuyViewModel.cs
+    ```js
+    public class BuyViewModel : ViewModelBase
+    {
+        private string _Symbol;
+
+        public string Symbol
+        {
+            get { return _Symbol; }
+            set { _Symbol = value; OnPropertyChanged(nameof(Symbol)); }
+        }
+    }
+    ```
+* SimpleTrader.WPF / Views / BuyView.xaml
+    ```js
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="auto" />
+        </Grid.RowDefinitions>
+
+        <WrapPanel Grid.Row="0" HorizontalAlignment="Center">
+            <TextBox Text="{Binding Symbol, UpdateSourceTrigger=PropertyChanged}" />
+            <Button Content="Search" Command="SearchSymbolCommand" /> 
+        </WrapPanel>
+    ```
+* SimpleTrader.WPF / ViewModels / BuyViewModel.cs
+    ```js
+    public class BuyViewModel : ViewModelBase
+    {
+        private string _Symbol;
+
+        public string Symbol
+        {
+            get { return _Symbol; }
+            set { _Symbol = value; OnPropertyChanged(nameof(Symbol)); }
+        }
+
+        public ICommand SearchSymbolCommand { get; set; }  // 추가
+    }
+* SimpleTrader.WPF / Commands / SearchSymbolCommand.cs
+    ```js
+    public class SearchSymbolCommand : ICommand
+    {
+        private readonly BuyViewModel _viewModel;
+        private readonly IStockPriceService _stockPriceService;
+
+        public event EventHandler CanExecuteChanged;
+
+        public SearchSymbolCommand(BuyViewModel viewModel, 
+            IStockPriceService stockPriceService)
+        {
+            _viewModel = viewModel;
+            _stockPriceService = stockPriceService;
+        }
+
+        public bool CanExecute(object parameter)
+        {
+            return true;
+        }
+
+        public async void Execute(object parameter)
+        {
+            try
+            {
+                double stockPrice = await _stockPriceService.GetPrice(_viewModel.Symbol);
+                // so the command basically talks back and
+                // forth between the view model
+                _viewModel.StockPrice = stockPrice;  // BuyViewModel 추가
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show(e.Message);
+            }
+        }
+    }
+    ```
+* SimpleTrader.WPF / ViewModels / BuyViewModel.cs
+    ```js
+    public class BuyViewModel : ViewModelBase
+    {
+        private string _Symbol;
+        public string Symbol
+        {
+            get { return _Symbol; }
+            set { _Symbol = value; OnPropertyChanged(nameof(Symbol)); }
+        }
+
+        // 추가
+        private double _stockPrice;
+        public double StockPrice
+        {
+            get { return _stockPrice; }
+            set { _stockPrice = value; OnPropertyChanged(nameof(StockPrice)); }
+        }
+
+        public ICommand SearchSymbolCommand { get; set; }
+    }
+* SimpleTrader.WPF / ViewModels / BuyViewModel.cs
+    ```js
+    public class BuyViewModel : ViewModelBase
+    {
+        private string _Symbol;
+        public string Symbol
+        {
+            get { return _Symbol; }
+            set { _Symbol = value; OnPropertyChanged(nameof(Symbol)); }
+        }
+
+        // 추가
+        private double _stockPrice;
+        public double StockPrice
+        {
+            get { return _stockPrice; }
+            set { _stockPrice = value; OnPropertyChanged(nameof(StockPrice)); }
+        }
+
+        public ICommand SearchSymbolCommand { get; set; } 
+
+        public BuyViewModel(IStockPriceService stockPriceService)
+        {
+            SearchSymbolCommand = new SearchSymbolCommand(this, stockPriceService);
+        }
+    }
+* SimpleTrader.WPF / Views / BuyView.xaml
+    ```js
+    <Grid Margin="20"  HorizontalAlignment="Center">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <WrapPanel Grid.Row="0" HorizontalAlignment="Center">
+            <TextBox Width="100" Text="{Binding Symbol, 
+                    UpdateSourceTrigger=PropertyChanged}" />
+            <Button Margin="10 0 0 0" Content="Search" 
+                    Command="{Binding SearchSymbolCommand}" />
+        </WrapPanel>
+
+        <WrapPanel Margin="0 10 0 0" Grid.Row="1">
+            <Border BorderBrush="Black" BorderThickness="1" Padding="20">
+                <StackPanel>
+                    <TextBlock HorizontalAlignment="Center" 
+                                FontSize="32" Text="{Binding Symbol}"/>
+                    <TextBlock Margin="0 10 0 0" 
+                                Text="{Binding StockPrice, StringFormat={}{0:C}}" />
+                </StackPanel>
+            </Border>
+            <Border BorderBrush="Black" BorderThickness="1" Padding="20">
+                <StackPanel>
+                    <WrapPanel Margin="0 10">
+                        <TextBlock Width="150" Text="Shares To buy:" />
+                        <TextBox Width="50" 
+                                    Text="{Binding SharesToBuy, 
+                                            UpdateSourceTrigger=PropertyChanged}" />
+                    </WrapPanel>
+                    <WrapPanel Margin="0 10">
+                        <TextBlock Width="150" Text="Price per share:" />
+                        <TextBox Width="50" 
+                                    Text="{Binding StockPrice, 
+                                        StringFormat={}{0:C}}" />
+                    </WrapPanel >
+                    <TextBlock HorizontalAlignment="Center" 
+                                FontSize="32" Margin="0 10" 
+                                Text="{Binding TotalPrice, StringFormat={}{0:C}}" />
+                    <Button Margin="0 10" Content="Buy" 
+                            Command="{Binding BuyStockCommand}" />
+                </StackPanel>
+            </Border>
+        </WrapPanel>
+    </Grid>
+    ```
+* SimpleTrader.WPF / ViewModels / BuyViewModel.cs
+    ```js
+    public class BuyViewModel : ViewModelBase
+    {
+        private string _Symbol;
+
+        public string Symbol
+        {
+            get { return _Symbol; }
+            set { _Symbol = value; OnPropertyChanged(nameof(Symbol)); }
+        }
+
+        private double _stockPrice;
+
+        public double StockPrice
+        {
+            get { return _stockPrice; }
+            set { _stockPrice = value; OnPropertyChanged(nameof(StockPrice)); }
+        }
+
+        private int _sharesToBuy;
+
+        public int SharesToBuy
+        {
+            get { return _sharesToBuy; }
+            set 
+            { 
+                _sharesToBuy = value; 
+                OnPropertyChanged(nameof(SharesToBuy));
+                OnPropertyChanged(nameof(TotalPrice));
+            }
+        }
+
+        public double TotalPrice
+        {
+            get
+            {
+                return SharesToBuy * StockPrice;
+            }
+        }
+
+        public ICommand SearchSymbolCommand { get; set; }
+        public ICommand BuyStockCommand { get; set; }
+
+        public BuyViewModel(IStockPriceService stockPriceService,
+            IBuyStockService buyStockService)
+        {
+            SearchSymbolCommand = new SearchSymbolCommand(this, stockPriceService);
+            BuyStockCommand = new BuyStockCommand(this, buyStockService);
+        }
+
+    }
+* SimpleTrader.WPF / Commands / BuyStockCommand.cs
+    ```js
+    public event EventHandler CanExecuteChanged;
+
+        private BuyViewModel _buyViewModel;
+        private IBuyStockService _buyStockService;
+
+        public BuyStockCommand(BuyViewModel buyViewModel, IBuyStockService buyStockService)
+        {
+            _buyViewModel = buyViewModel;
+            _buyStockService = buyStockService;
+        }
+
+        public bool CanExecute(object parameter)
+        {
+            return true;
+        }
+
+        public async void Execute(object parameter)
+        {
+            try
+            {
+                // in the future, we'll easily have an Account to sue here
+                Account account = await _buyStockService.BuyStock(new Account()
+                {
+                    Id = 1,
+                    Balance = 500,
+                    AssetTransactions = new List<AssetTransaction>()
+                }, _buyViewModel.Symbol, _buyViewModel.SharesToBuy);
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show(e.Message);
+            }
+        }
+    ```

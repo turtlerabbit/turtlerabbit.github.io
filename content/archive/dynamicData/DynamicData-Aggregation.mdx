@@ -1,0 +1,32 @@
+---
+title: Dynamic Data - Aggregation
+date: '2021-01-12 04'
+tag: DynamicData, Aggregations, StartWithEmpty()
+---
+#
+### 1. Aggregation
+* Available aggregations : Max, Min, Avg, StdDev, Count, Sum.  
+* For custom aggregations use : source.Connect().ToCollection().Select(items=>...);
+```js
+public Aggregations(IObservableList<int> source)
+{
+    var shared = source
+        .Connect()
+        // 기본적으로 dd는 change set이 비어있을 때 즉, 
+        // 소스에 데이터가 없을 때 구독시 알리지 않는다.
+        // 이는 데이터가 로드 될때까지 결과가 계산되지 않음을 의미한다.
+        // 그러나 데이터 소스가 비어 있어도 결과가 필요하면 StartWithEmpty()를 사용한다.
+        .StartWithEmpty()
+        // use standard rx Publish(), Connect() to share published changesets
+        .Publish();
+
+    this.cleanUp = new CompositeDisposable
+    (
+        shared.Maximum(i => i).Subscribe(max => Max = max),
+        shared.Minimum(i => i).Subscribe(min => Min = min),
+        shared.Avg(i => i).Subscribe(avg => Avg = avg),
+
+        shared.Connect()
+    );
+}
+```

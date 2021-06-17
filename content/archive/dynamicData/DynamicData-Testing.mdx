@@ -1,0 +1,72 @@
+---
+title: Dynamic Data - Testing
+date: '2021-01-12 10'
+tag: DynamicData, BatchIf(), ViewModel
+---
+#
+### 1. ViewModel
+* Illustrates how to test a view model when using dynamic data
+```js
+public ViewModel(IDataProvider dataProvider, ISchedulerProvider schedulerProvider)
+{
+    var paused = this.WhenValueChanged(vm => vm.IsPaused);
+
+    var dataLoader = dataProvider.ItemCache
+        .Connect()
+        .Transform(CreateItemViewModel)
+        .BatchIf(paused, schedulerProvider.Background) // 일시중지 + 백그라운드 테스트
+        .Sort(SortExpressionComparer<ItemsViewModel>.Descending(i => i.Item.Id))
+        .Bind(out var bindingData)
+        .Subscribe();
+
+    BindingData = bindingData;
+
+    var counter = dataProvider.ItemCache.CountChanged
+        .Subscribe(i => ShowEmptyView = i == 0);
+
+    this.cleanUp = new CompositeDisposable(dataLoader, counter);
+}
+
+private ItemsViewModel CreateItemViewModel(Item item)
+{
+    return new ItemsViewModel(item);
+}
+
+#
+
+var schedulerProvider = new TestSchedulerProvider();
+using (var testData = new DataProviderStub())
+using (var sut = new ViewModel(testData, schedulerProvider))
+{
+    // Act
+    var items = Enumerable
+        .Range(1, 10)
+        .Select(i => new Item(i))
+        .ToArray();
+    testData.Data.AddOrUpdate(items);
+
+    // 1. Check count of data
+    Console.WriteLine(sut.BindingData.Count); // 10
+
+    // 2. Check Transform and Sort
+    var expectedData = items
+        .Select(i => new ItemsViewModel(i))
+        .OrderByDescending(vm => vm.Item.Id);
+    foreach (var item in expectedData)
+    {
+        Console.WriteLine(item.Item.Id);  // 10 ~ 1
+    }
+}
+```
+#
+```js
+DynamicData.ObservableCacheEx.BatchIf();
+// pause signal이 수신 된 경우 기본 업데이트를 일괄 처리한다.
+// (i.e when the buffer selector return true)
+// resume signal이 수신 되면 일괄 업데이트가 실행된다.
+
+public static IObservable<IChangeSet<TObject, TKey>> 
+    BatchIf<TObject, TKey>(this IObservable<IChangeSet<TObject, TKey>> source, 
+        IObservable<bool> pauseIfTrueSelector, IScheduler? scheduler = null) 
+            where TKey : notnull;
+```

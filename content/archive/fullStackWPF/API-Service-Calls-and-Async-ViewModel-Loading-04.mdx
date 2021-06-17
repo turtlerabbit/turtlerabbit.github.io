@@ -1,0 +1,212 @@
+---
+title: FULL STACK WFP 04 - API Service Calls and Async ViewModel Loading
+date: '2021-05-12 04'
+tag: WPF, FullStack, Navigation, API Service Calls, Async ViewModel Loading
+---
+#
+주요 주가 지수에 대한 정보를 로드하는 서비스를 만들어 service layer를 확장한다.  
+이 서비스는 HttpClient를 사용하여 FinancialModelingPrep API에서 JSON 데이터를 검색하고  
+Json.NET을 사용하여 JSON을 개체로 역직렬화한다.  
+그런 다음, I use the service in a ViewModel to load major stock index information.
+#
+### 1. Extend our service layer by creating a service to load information about major stock indexes
+* SimpleTrader.Domain / Services / IMajorIndexService.cs
+    ```js
+    public interface IMajorIndexService
+    {
+        Task<MajorIndex> GetMajorIndex(MajorIndexType indexType);
+    }
+    ```
+* SimpleTrader.Domain / Models / MajorIndex.cs
+    ```js
+    public class MajorIndex
+    {
+        public double Price { get; set; }
+        public double Changes { get; set; }
+        public MajorIndexType Type { get; set; }
+    }
+
+    public enum MajorIndexType
+    {
+        DowJones,
+        Nasdaq,
+        SP500
+    }
+    ```
+#
+### 2. Use an HttpClient
+* Add a new project : Class Library - SimpleTrader.FinancialModelingPrepAPI
+* SimpleTrader.FinancialModelingPrepAPI / Services / MajorIndexService.cs
+    ```js
+    // NuGet - Newtonsoft.Json 설치 : JsonConvert.DeserializeObject();
+
+    public class MajorIndexService : IMajorIndexService
+    {
+        public async Task<MajorIndex> GetMajorIndex(MajorIndexType indexType)
+        {
+            string apikey = "?apikey=de2b";
+            string uri = "https://finte.com/api/" + GetUriSuffix(indexType) + apikey;
+
+            using(HttpClient client = new HttpClient())
+            {
+                HttpResponseMessage response = await client.GetAsync(uri);
+                string jsonResponse = await response.Content.ReadAsStringAsync();
+
+                MajorIndex majorIndex = 
+                        JsonConvert.DeserializeObject<MajorIndex>(jsonResponse);
+
+                return majorIndex;
+            }
+        }
+    }
+    ```
+* Testing - SimpleTrader.WPF / App.xaml.cs
+    ```js
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        new MajorIndexService()
+            .GetMajorIndex(Domain.Models.MajorIndexType.DowJones)
+            .ContinueWith((task) =>
+            {
+                // Since we named the MajorIndex properties the same 
+                // as the fields of the JSON API object,
+                // the properties are automatically populated when we deserialize.
+                MajorIndex index = task.Result;
+            });
+        
+        ....
+    }        
+    ```
+* SimpleTrader.FinancialModelingPrepAPI / Services / MajorIndexService.cs
+    ```js
+    public class MajorIndexService : IMajorIndexService
+    {
+        public async Task<MajorIndex> GetMajorIndex(MajorIndexType indexType)
+        {
+            string apikey = "?apikey=de2b";
+            string uri = "https://finte.com/api/" + GetUriSuffix(indexType) + apikey;
+
+            using(HttpClient client = new HttpClient())
+            {
+                HttpResponseMessage response = await client.GetAsync(uri);
+                string jsonResponse = await response.Content.ReadAsStringAsync();
+
+                MajorIndex majorIndex = 
+                        JsonConvert.DeserializeObject<MajorIndex>(jsonResponse);
+                majorIndex.Type = indexType;
+                //majorIndex.Price = 23.00;
+                //majorIndex.Changes = 2.0;
+
+                return majorIndex;
+            }
+        }
+
+        private string GetUriSuffix(MajorIndexType indexType)
+        {
+            switch (indexType)
+            {
+                case MajorIndexType.DowJones:
+                    return "%5EDJI";
+                case MajorIndexType.Nasdaq:
+                    return "%5EIXIC";
+                case MajorIndexType.SP500:
+                    return "%5EGSPC";
+                default:
+                    return "%5EDJI";
+            }
+        }
+    }
+    ```
+#
+### 3. Async ViewModel Loading
+* SimpleTrader.WPF / ViewModels / MajorIndexViewModel.cs
+    ```js
+    public class MajorIndexViewModel
+    {
+        private readonly IMajorIndexService _majorIndexService;
+        public MajorIndex DowJones { get; set; }
+        public MajorIndex Nasdaq { get; set; }
+        public MajorIndex SP500 { get; set; }
+
+        public MajorIndexViewModel(IMajorIndexService majorIndexService)
+        {
+            _majorIndexService = majorIndexService;
+        }
+
+        // whthout having a MajorIndexViewModel
+        public static MajorIndexViewModel 
+                        LoadMajorIndexViewModel(IMajorIndexService majorIndexService)
+        {
+            MajorIndexViewModel majorIndexViewModel = 
+                        new MajorIndexViewModel(majorIndexService);
+            majorIndexViewModel.LoadMajorIndexs();
+            return majorIndexViewModel;
+        }
+
+        private async Task LoadMajorIndexs()
+        {
+            DowJones = await _majorIndexService.GetMajorIndex(MajorIndexType.DowJones);
+            Nasdaq = await _majorIndexService.GetMajorIndex(MajorIndexType.Nasdaq);
+            SP500 = await _majorIndexService.GetMajorIndex(MajorIndexType.SP500);
+        }
+    }
+    ```
+* SimpleTrader.WPF / ViewModels / MajorIndexViewModel.cs
+    ```js
+    ....
+
+    // Task를 기다리기 보다 실행을 계속 그래서 void
+    private void LoadMajorIndexs()
+        {
+            _majorIndexService
+                .GetMajorIndex(MajorIndexType.DowJones)
+                // ContinueWith는 작업의 결과를 콜백하므로 여기에 작은 함수를 전달.
+                .ContinueWith(task =>  
+                {
+                    if (task.Exception == null)
+                    {
+                        DowJones = task.Result;
+                    }
+                });
+
+            _majorIndexService
+                .GetMajorIndex(MajorIndexType.Nasdaq)
+                .ContinueWith(task =>
+                {
+                    if (task.Exception == null)
+                    {
+                        Nasdaq = task.Result;
+                    }
+                });
+
+            _majorIndexService
+                .GetMajorIndex(MajorIndexType.SP500)
+                .ContinueWith(task =>
+                {
+                    if (task.Exception == null)
+                    {
+                        SP500 = task.Result;
+                    }
+                });
+        }
+    ```
+* SimpleTrader.WPF / ViewModels / HomeViewModel.cs
+    ```js
+    public class HomeViewModel : ViewModelBase
+    {
+        public MajorIndexViewModel MajorIndexViewModel { get; set; }
+
+        public HomeViewModel(MajorIndexViewModel majorIndexViewModel)
+        {
+            MajorIndexViewModel = majorIndexViewModel;
+        }        
+    }
+    ```
+* SimpleTrader.WPF / Commands / UpdateCurrentViewModelCommand.cs
+    ```js
+    case ViewType.Home:
+        _navigator.CurrentViewModel = 
+            new HomeViewModel(MajorIndexViewModel
+                    .LoadMajorIndexViewModel(new MajorIndexService()));
+        break;
+    ```

@@ -1,0 +1,194 @@
+---
+title: Dynamic Data - Summary
+date: '2021-01-13 01'
+tag: DynamicData, 요약, 정리, Summary
+---
+
+## 1. Create Dynamic Data Collections 요약
+```js
+// 1. 데이터 소스:
+SourceCache<TObject, TKey>, SourceList<TObject>
+
+// 2. 데이타 소스에 바로 edit methods 사용
+SourceCache<TObject, TKey>.AddOrUpdata(Items);
+SourceCache<TObject, TKey>.Edit(cache => cache.AddOrUpdata(Items));
+
+// 3. 데이타 소스에서 바로 읽기 전용 public으로 노출할 때
+//    새로운 observable list를 만든다.
+IObservableCache<TObject,TKey> 
+    SourceCache<TObject, TKey>.AsObservableCache();
+
+
+// 4. Creating Observable Change Sets : IObservable<IChangeSet<TObject,TKey>>
+
+// 4.1 데이타 소스에 바로 연결
+IObservable<IChangeSet<TObject,TKey>> 
+    SourceCache<TObject, TKey>.Connect();
+
+// 4.2 from an Rx Observable.
+//     form an Observable Collection.
+//     from an Binding List.
+IObservable<IChangeSet<TObject,TKey>> 
+    IObservable<IEnumerable<T>>.ToObservableChangeSet(t=> t.key);
+
+// 4.3 ObservableChacneSet 정적 클래스 사용
+IObservable<IChangeSet<TObject,TKey>> 
+    ObservableChangeSet.Create<Trade, long>(ISourceCache<Trade, long> =>
+    {
+        ISourceCache<TObject, TKey>.AddOrUpdate(IEnumerable<trade>);
+    }, trade = > trade.Id);
+
+// 5. Summary
+1. observable change set에 대한 단일 구독을 공유하기 위해
+    -> IObservable<IChangeSet<>>.Publish()
+    -> Return : IConnectableObservable
+
+2. 공유를 가능하게 만든 후, 읽기전용인 파생 컬렉션을 만들어 노출
+    -> IConnectableObservable.AsObservableCache()
+    -> Return : IObservableCache : IConnectableCache
+
+3. 읽기전용으로 노출된 외부에서 change set을 방출하는 observable을 반환
+    -> IConnectableCache.Connect()
+    -> Return : IObservable<IChangeSet<>>
+
+4. 
+public class SourceList<T> : ISourceList<T>, IObservableList<T>, IDisposable
+public class SourceCache<TObject, TKey> : ISourceCache<TObject, TKey>, 
+    IObservableCache<TObject, TKey>, IConnectableCache<TObject, TKey>, IDisposable 
+    where TKey : notnull
+```
+#
+## 2. Sample 요약
+```js
+// IEnumerable<T>
+IEnumerable<Trade> Generate(int numberToGenerate)
+
+
+// Creating Observable Change Sets : IObservable<IChangeSet<TObject,TKey>>
+IObservable<IChangeSet<Trade,long>> 
+    ObservableChangeSet.Create<Trade, long>(ISourceCache<Trade, long> =>
+    {
+        ISourceCache<Trade, long>.AddOrUpdate(Generate());
+    }, trade = > trade.Id);
+
+
+// 기본 시퀀스(Observbale Change Sets)에 대한 단일 구독을 공유하기 위해
+IConnectableObservable<IChangeSet<Trade, long>> 
+    IObservable<IChangeSet<Trade, long>>.Publish();
+
+
+// 읽기전용인 파생 컬렉션을 만들어 노출하기 위해
+IObservableCache<Trade, long> 
+    IConnectableObservable<IChangeSet<Trade, long>>.AsObservableCache();
+
+
+// IObservableCache는 IConnectableCache를 상속받은 모습이다.
+public interface IObservableCache<TObject, TKey>
+    : IConnectableCache<TObject, TKey>, IDisposable where TKey : notnull
+
+
+// 읽기전용으로 노출된 외부에서 Connect()함으로써 
+// change set을 방출하는 observable을 반환한다.
+IObservable<IChangeSet<Trede, long>> 
+    IConnectableCache<Trade, long>.Connect();
+```
+#
+## 3. Change Set Creation 요약
+```js
+// 1. FromObservable
+`2개의 observables`를 받아 하나의 `IObservable<IChangeSet<T, TKey>>`을 만들어 반환한다.  
+
+// 2. FromTask
+Create an `observable change set` from a `Task`
+
+// 3. Reloadable
+이전 data를 지우고 새로이 로드된 data를 추가하는 기능의 
+DynamicData의 `Switch()` 연산자를 사용하여 반복적으로 data를 다시 로드한다.
+
+// 4. Reloadable With EditDiff
+노이즈를 크게 줄일 수 있는 `불필요한 업데이트를 예방`하기 위해 
+이전 로드와의 diff set를 계산하는 `ISourceCache<TObject, TKey>.EditDiff()`를 사용하여
+다시 로드하고 목록을 유지한다.
+
+// 5. FromTask With RefCount
+구독이 하나 이상 있는 한 소스에 연결된 상태로 유지되는 시퀀스를 반환한다.  
+구독이 0이면 자신을 해지하고 다시 새로운 구독이 오면 처음부터 자동으로 시작한다.
+`RefCount()`는 `표준 rx Publish().RefCount()` 작업의 dd 오버로드이다.
+dd가 자동으로 처리하므로 `Publish()`를 사용하지 않는다.
+
+// 6. WithRetry
+`Retry()` : In an enterprise app, would probably use a backoff retry strategy
+```
+#
+## 4. Inspect Collection 요약
+```js
+// 1. 소스의 항목이 추가 되거나 제거 될 때 전체 컬렉션을 검사하는 방법.
+ObservableCacheEx.ToCollection();  
+
+this.cleanUp = source
+    .Connect()
+    .ToCollection()  // 소스가 변경 될 때마다 새 컬렉션이 생성된다.
+
+#
+
+// 2. TObject의 속성이 변경 될 때 전체 컬렉션을 검사하는 방법.
+ObservableCacheEx.AutoRefresh();
+
+this.cleanUp = source
+    .Connect()
+    .AutoRefresh(vm => vm.IsActive)  // vm은 TObject, TObject.Property가 변경 될 때
+    .ToCollection()  // 소스의 항목인 TObject가 추가되거나 삭제 될 때
+
+#
+
+// 3. 전체 컬렉션을 검사하고 
+//    내부 observables의 항목이 활성 상태인지 여부를 대조하는 방법.
+ObservableCacheEx.MergeMany();
+Observable.CombineLatest(); 
+
+var activeChanged = observableWithState
+    .MergeMany(state => state.IsActive)  // IObservable<bool> IsActive
+    // 항목이 기본 목록에 추가 될 때 observable을 자동으로 연결하고 
+    // 항목이 제거되면 연결을 해제.
+
+var collectionChanged = observableWithState.ToCollection();
+// 기본 observable 목록이 변경 될 때(추가, 제거 및 교체) 
+// 전체 컬렉션을 공개(reveal)한다.
+
+collectionChanged
+    .CombineLatest(activeChanged, (items, _) =>
+    {
+        // collectionChanged, activeChanged 중 하나가 요소를 생성 할 때마다 
+        // 호출하는 function.
+        return items.Any() &&
+        items.All(state => 
+        {
+          state.LatestValue.HasValue && state.LatestValue == true;
+        });
+    });
+
+#
+
+// 4. 선택된 아이템들을 모니터링
+ObservableCacheEx.WhenPropertyChanged();  
+// 컬렉션의 각 항목을 보고 변경된 항목이 있으면 알린다.
+
+var selectedItems = this.source
+    .Connect()
+    .AutoRefresh(si => si.IsSelected)
+    .Filter(si => si.IsSelected)
+    .ToCollection()
+    .StartWithEmpty()
+    .Publish();
+
+// 기본 목록이 변경되거나 IsSelected가 변경 될 때 관찰 가능 항목을 생성.
+var shared = this.source.Connect().Publish();
+var selectedChanged = shared
+    .WhenPropertyChanged(si => si.IsSelected)
+    .Select(_ => Unit.Default)
+    .StartWith(Unit.Default);
+var collectionChanged = shared
+    .ToCollection()
+    .CombineLatest(selectedChanged, (items, _) => items)
+    .Publish();
+```

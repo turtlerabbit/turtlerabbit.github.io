@@ -1,0 +1,210 @@
+---
+title: FULL STACK WFP 11 - Dynamic Views and Custom Element Styles
+date: '2021-05-12 11'
+tag: WPF, FullStack, Dynamic Views, Custom Element Styles
+---
+#
+주식 매입에 사용되는 BuyView의 기능, 스타일, 레이아웃을 개선한다.  
+뷰의 기능을 개선하기 위해 BuyViewModel에서 일부 속성 바인딩을 수정하고 BuyView에서 DataTrigger를 만들어 주식이 검색 될 때까지 검색결과패널을 숨긴다.  
+또한 TextBox 및 Button 컨트롤에 대한 사용자 지정 요소 스타일을 추가하여 View의 스타일을 개선한다.  
+마지막으로 각 하위 패널의 크기를 개선하기 위해 패널 레이아웃을 WrapPanel에서 '*' 너비가 있는 그리드로 변환한다.
+#
+### 1. Improve the functionality, style, and layout of the BuyView, which is used to purchase stocks.
+* SimpleTrader.WPF / Views / BuyView.xaml
+    ```js
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <WrapPanel Grid.Row="0" HorizontalAlignment="Center">
+            <TextBox Width="100" Text="{Binding Symbol, 
+                                        UpdateSourceTrigger=PropertyChanged}" />
+            <Button Margin="5 0 0 0" Content="Search" 
+                    Command="{Binding SearchSymbolCommand}" />
+        </WrapPanel>
+
+        <Grid Margin="0 20 0 0" Grid.Row="1" MaxWidth="500">
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding SearchResultSymbol}" Value="">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="2*" />
+            </Grid.ColumnDefinitions>
+            
+            <Border Grid.Column="0" BorderBrush="Gray" BorderThickness="1" 
+                    Padding="20" CornerRadius="3 0 0 3">
+                <StackPanel>
+                    <TextBlock HorizontalAlignment="Center" 
+                                FontSize="32" Text="{Binding SearchResultSymbol}"/>
+                    <TextBlock HorizontalAlignment="Center" Margin="0 10 0 0" 
+                                Text="{Binding StockPrice, StringFormat={}{0:C}}" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="1" BorderBrush="Gray" BorderThickness="0 1 1 1" 
+                    Padding="20" CornerRadius="0 3 3 0">
+                <StackPanel HorizontalAlignment="Center">
+                    <WrapPanel Margin="0 10">
+                        <TextBlock Width="150" Text="Shares To buy:" />
+                        <TextBox Width="50" Text="{Binding SharesToBuy, 
+                                                   UpdateSourceTrigger=PropertyChanged}" />
+                    </WrapPanel>
+                    <WrapPanel Margin="0 10">
+                        <TextBlock Width="150" Text="Price per share:" />
+                        <TextBlock Width="50" Text="{Binding StockPrice, 
+                                                        StringFormat={}{0:C}}" />
+                    </WrapPanel >
+                    <TextBlock HorizontalAlignment="Center" FontSize="32" Margin="0 10" 
+                                Text="{Binding TotalPrice, StringFormat={}{0:C}}" />
+                    <Button Margin="0 10" Padding="20 5" FontSize="24" Content="Buy" 
+                                Command="{Binding BuyStockCommand}" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+    ```
+* SimpleTrader.WPF / ViewModels / BuyViewModel.cs
+    ```js
+    Public class public class BuyViewModel : ViewModelBase
+    {
+        private string _Symbol;
+        public string Symbol
+        {
+            get { return _Symbol; }
+            set { _Symbol = value; OnPropertyChanged(nameof(Symbol)); }
+        }
+
+        private string _searchResultSymbol = string.Empty;
+        public string SearchResultSymbol
+        {
+            get { return _searchResultSymbol; }
+            set 
+            { 
+                _searchResultSymbol = value; 
+                OnPropertyChanged(nameof(SearchResultSymbol)); 
+            }
+        }
+
+        private double _stockPrice;
+        public double StockPrice
+        {
+            get { return _stockPrice; }
+            set 
+            { 
+                _stockPrice = value; 
+                OnPropertyChanged(nameof(StockPrice));
+                OnPropertyChanged(nameof(TotalPrice));
+            }
+        }
+
+        private int _sharesToBuy;
+        public int SharesToBuy
+        {
+            get { return _sharesToBuy; }
+            set 
+            { 
+                _sharesToBuy = value; 
+                OnPropertyChanged(nameof(SharesToBuy));
+                OnPropertyChanged(nameof(TotalPrice));
+            }
+        }
+
+        public double TotalPrice
+        {
+            get { return SharesToBuy * StockPrice; }
+        }
+
+        public ICommand SearchSymbolCommand { get; set; }
+        public ICommand BuyStockCommand { get; set; }
+
+        public BuyViewModel(IStockPriceService stockPriceService,
+            IBuyStockService buyStockService)
+        {
+            SearchSymbolCommand = new SearchSymbolCommand(this, stockPriceService);
+            BuyStockCommand = new BuyStockCommand(this, buyStockService);
+        }
+    }
+    ```
+* SimpleTrader.WPF / Commands / SearchSymbolCommand.cs
+    ```js
+    public async void Execute(object parameter)
+        {
+            try
+            {
+                double stockPrice = await _stockPriceService.GetPrice(_viewModel.Symbol);
+                _viewModel.SearchResultSymbol = _viewModel.Symbol.ToUpper();
+                _viewModel.StockPrice = stockPrice;
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show(e.Message);
+            }
+        }
+    ```
+* SimpleTrader.WPF / Styles / Common.xaml
+    ```js
+    <!--Text Boxes-->
+    <Style TargetType="TextBox">
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border BorderThickness="1" BorderBrush="Gray" CornerRadius="3">
+                        <ScrollViewer x:Name="PART_ContentHost" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    
+    <!-- Button -->
+    <Style TargetType="Button">
+        <Setter Property="Background" Value="{StaticResource BrushPrimary2}" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Padding" Value="10 5" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border CornerRadius="3" 
+                            Background="{TemplateBinding Background}"
+                            Padding="{TemplateBinding Padding}"
+                            Margin="{TemplateBinding Margin}">
+                        <!--We can use ContentPresenter on Buttons and not TextBoxes 
+                            because Buttons are derived from ContentControl-->
+                        <ContentPresenter />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{StaticResource BrushPrimary1}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+    ```
+* SimpleTrader.WPF / MainWindow.xaml
+    ```js
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        
+        <controls:NavigationBar Grid.Row="0" DataContext="{Binding Navigator}" />
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" 
+                      HorizontalScrollBarVisibility="Disabled">
+            <ContentControl Content="{Binding Navigator.CurrentViewModel}" />
+        </ScrollViewer>
+    </Grid>
+    ```

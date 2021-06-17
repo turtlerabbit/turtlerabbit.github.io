@@ -13,7 +13,7 @@ export default styled(SearchBox)`
   display: flex;
   flex-direction: row-reverse;
   align-items: center;
-  margin-bottom: 0;
+  margin-bottom: 2.5em;
   .SearchInput {
     outline: none;
     border: auto;

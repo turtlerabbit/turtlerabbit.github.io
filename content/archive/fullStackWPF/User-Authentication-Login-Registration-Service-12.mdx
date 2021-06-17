@@ -1,0 +1,177 @@
+---
+title: FULL STACK WFP 12 - User Authentication (Login/Registration) Service
+date: '2021-05-12 12'
+tag: WPF, FullStack, Login, Registration, User Authentication
+---
+#
+SimpleTrader에 대한 인증 서비스를 설정한다.  
+이 서비스를 통해 사용자는 계정을 등록하고 계정에 로그인 할 수 있다.   
+또한 인증 서비스에서 이메일 및 사용자 이름으로 계정을 효율적으로 가져올 수 있도록 계정에 대한 IDataService를 IAccountService로 확장한다. 
+#
+### 1. setup an authentication service for SimpleTrader.
+* SimpleTrader.Domain / Models / User.cs
+    ```js
+    public class User : DomainObject
+    {
+        public string Email { get; set; }
+        public string Username { get; set; }
+        public string PasswordHash { get; set; }  // 수정
+        public DateTime DatedJoined { get; set; }
+    }
+    ```
+* Package Manager Console
+    ```js
+    // Password => PasswordHash
+
+    PM> add-migration password_hash
+    PM> update-datebase
+    ```
+* SimpleTrader.Domain / Services / AuthenticationServices / IAuthenticationService.cs
+    ```js
+    public enum RegistrationResult
+    {
+        Success,
+        PasswordsDoNotMatch,
+        EmailAlreadyExists,
+        UsernameAlreadyExists
+    }
+    
+    public interface IAuthenticationService
+    {        
+        Task<RegistrationResult> Register(string email, 
+                    string username, string password, string confirmPasswrod);
+        Task<Account> Login(string username, string password);
+    }
+    ```
+* SimpleTrader.Domain / Services / AuthenticationServices / AuthenticationService.cs
+    ```js
+    public class AuthenticationService : IAuthenticationService
+    {
+        private readonly IAccountService _accountService;
+
+        // using Microsoft.AspNet.Identity;
+        private readonly IPasswordHasher _passwordHasher;
+
+        public AuthenticationService(IAccountService accountService, 
+                    IPasswordHasher passwordHasher)
+        {
+            _accountService = accountService;
+            _passwordHasher = passwordHasher;
+        }
+
+        public async Task<Account> Login(string username, string password)
+        {
+            // 1. Get the user's account from the database
+            // 2. Hash the password provided in the method
+            // 3. Campare the hashed provided password to the database hasehd password
+
+            Account storedAccount = await _accountService.GetByUsername(username);
+
+            PasswordVerificationResult passwordResult = _passwordHasher
+                .VerifyHashedPassword(storedAccount.AccountHolder.PasswordHash, password);
+
+            if (passwordResult != PasswordVerificationResult.Success)
+            {
+                throw new InvalidPasswordException(username, password);
+            }
+
+            return storedAccount;
+        }
+
+        public async Task<RegistrationResult> Register(string email, 
+                    string username, string password, string confirmPasswrod)
+        {
+            RegistrationResult result = RegistrationResult.Success;
+
+            if (password != confirmPasswrod)
+            {
+                result = RegistrationResult.PasswordsDoNotMatch;
+            }
+
+            Account emailAccount = await _accountService.GetByEmail(email);
+            if (emailAccount != null)
+            {
+                result = RegistrationResult.EmailAlreadyExists;
+            }
+
+            Account usernameAccount = await _accountService.GetByUsername(username);
+            if (usernameAccount != null)
+            {
+                result = RegistrationResult.UsernameAlreadyExists;
+            }
+
+            if (result == RegistrationResult.Success)
+            {
+                string hashedPassword = _passwordHasher.HashPassword(password);
+
+                User user = new User()
+                {
+                    Email = email,
+                    Username = username,
+                    PasswordHash = hashedPassword,
+                    DatedJoined = DateTime.Now
+                };
+
+                Account account = new Account()
+                {
+                    AccountHolder = user
+                };
+
+                await _accountService.Create(account);
+            }
+           
+            return result;
+        }
+    }
+    ```
+* SimpleTrader.Domain / Services /
+    ```js
+    public interface IAccountService : IDataService<Account>
+    {
+        Task<Account> GetByUsername(string username);
+        Task<Account> GetByEmail(string email);
+    }
+    ```
+* SimpleTrader.WPF / App.xaml.cs
+    ```js
+    ...
+    services.AddSingleton<SimpleTraderDbContextFactory>();
+    services.AddSingleton<IAuthenticationService, AuthenticationService>();   // 추가
+    services.AddSingleton<IDataService<Account>, AccountDataService>();
+    services.AddSingleton<IAccountService, AccountDataService>();      // 추가
+    services.AddSingleton<IStockPriceService, StockPriceService>();
+    services.AddSingleton<IBuyStockService, BuyStockService>();
+    services.AddSingleton<IMajorIndexService, MajorIndexService>();
+
+    services.AddSingleton<IPasswordHasher, PasswordHasher>();   // 추가
+    ...
+    ```
+* SimpleTrader.Domain / Exceptions / InvalidPasswordException.cs
+    ```js
+    public class InvalidPasswordException : Exception
+    {
+        public string Username { get; set; }
+        public string Password { get; set; }
+
+        public InvalidPasswordException(string username, string password)
+        {
+            Username = username;
+            Password = password;
+        }
+
+        public InvalidPasswordException(string message, 
+                string username, string password) : base(message)
+        {
+            Username = username;
+            Password = password;
+        }
+
+        public InvalidPasswordException(string message, 
+                Exception innerException, string username, string password) : 
+                    base(message, innerException)
+        {
+            Username = username;
+            Password = password;
+        }
+    }
+    ```

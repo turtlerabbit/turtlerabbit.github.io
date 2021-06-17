@@ -1,0 +1,191 @@
+---
+title: Dynamic Data - Create Dynamic Data Collections
+date: '2021-01-10 01'
+tag: DynamicData, SourceCache, SourceList, observable-change-sets, ToObservableChangeSet, ObservableChangeSet 
+---
+
+DynamicData 사용의 개념은 
+데이터 소스 ( `SourceCache<TObject, TKey>` 또는 `SourceList<TObject>` ) 를 유지 한 다음 
+다양한 연산자 조합을 연결하여 컬렉션을 직접 관리 할 필요없이 데이터를 선언적으로 조작하고 형성하는 것이다.
+
+## Create Dynamic Data Collections
+#
+### The Observable List
+```js
+// Create an observable list like this:
+var myInts = new SourceList<int>();
+
+// The observable list provides the direct edit methods you would expect.
+myInts.AddRange(Enumerable.Range(0, 10000)); 
+myInts.Add(99999); 
+myInts.Remove(99999);
+
+// This is achieved using the .Edit method 
+// which ensures only a single change notification is produced.
+myInts.Edit(innerList =>
+{
+   innerList.Clear();
+   innerList.AddRange(Enumerable.Range(0, 10000));
+});
+
+// If myInts is to be exposed publicly 
+// it can be made read only using .AsObservableList
+IObservableList<int> readonlyInts = myInts.AsObservableList();
+
+// list의 변경 사항은 다음 myInts.Connect()과 같이 호출하여 관찰 할 수 있다.
+IObservable<IChangeSet<int>> myIntsObservable = myInts.Connect();
+
+// 이렇게 하면 수십 개의 operators가 있는 observable change set가 생성된다.
+```
+#
+### The Observable Cache
+```js
+// Create an observable cache like this:
+var myCache = new SourceCache<TObject,TKey>(t => key);
+
+// There are direct edit methods, for example
+myCache.Clear();
+myCache.AddOrUpdate(myItems);
+
+// 여러 수정을 할 때 효율성을 높이기 위해 캐쉬는 일괄 편집 수단을 제공한다.
+myCache.Edit(innerCache =>
+{
+    innerCache.Clear();
+    innerCache.AddOrUpdate(myItems);
+});
+
+// 읽기 전용으로 public으로 노출할 때,
+IObservableCache<TObject,TKey> readonlyCache = myCache.AsObservableCache();
+
+// The cache is observed by calling myCache.Connect() like this:
+IObservable<IChangeSet<TObject,TKey>> myCacheObservable = myCache.Connect();
+```
+#
+```js
+SourceCache<TObject, TKey>  // An observable cache which exposes an update API. 
+                            // Used at the root of all observable chains.
+
+public class SourceCache<TObject, TKey> : ISourceCache<TObject, TKey>, 
+      IObservableCache<TObject, TKey>, IConnectableCache<TObject, TKey>, 
+      IDisposable where TKey : notnull
+{
+    public SourceCache(Func<TObject, TKey> keySelector);
+
+    public int Count { get; }
+    public IObservable<int> CountChanged { get; }
+    public IEnumerable<TObject> Items { get; }
+    public IEnumerable<TKey> Keys { get; }
+    public Func<TObject, TKey> KeySelector { get; }
+    public IEnumerable<KeyValuePair<TKey, TObject>> KeyValues { get; }
+
+    public IObservable<IChangeSet<TObject, TKey>> 
+        Connect(Func<TObject, bool>? predicate = null);
+    public void Dispose();
+    public void Edit(Action<ISourceUpdater<TObject, TKey>> updateAction);
+    public Optional<TObject> Lookup(TKey key);
+    public IObservable<IChangeSet<TObject, TKey>> 
+        Preview(Func<TObject, bool>? predicate = null);
+    public IObservable<Change<TObject, TKey>> Watch(TKey key);
+    protected virtual void Dispose(bool isDisposing);
+}
+```
+#
+## Creating Observable Change Sets
+Dynamic Data is based on the concept of creating and manipulating **observable change sets.**
+observable change sets을 만드는 기본 방법은 `ISourceCache<T, K>` 및 `ISourceList<T>`의 인스턴스에 연결하는 것이다. 
+```js
+// Connect to a Cache or List
+var myObservableChangeSet = myDynamicDataSource.Connect();
+```
+그러나 데이터 소스에 따라 observables change sets를 생성하는 대체 방법이 있다.
+```js
+// Create an Observable Change Set from an Rx Observable
+IObservable<T> myObservable;
+IObservable<IEnumerable<T>> myObservable;
+var myObservableChangeSet = myObservable.ToObservableChangeSet(t=> t.key);
+
+// To create a size limited cache,
+var myConnection = 
+        myObservable.ToObservableChangeSet(t=> t.key, limitSizeTo:10000);
+
+#
+
+// Create an Observable Change Set from an Observable Collection
+// This method is only recommended for simple queries 
+// which act only on the UI thread as ObservableCollection is not thread safe.
+var myObservableCollection = new ObservableCollection<T>();
+var myConnection = myObservableCollection.ToObservableChangeSet(t => t.Key);
+
+#
+
+// Create an Observable Change Set from an Binding List
+var myBindingList = new BindingList<T>();
+var myConnection = myBindingList.ToObservableChangeSet(t => t.Key);
+```
+#
+observable change sets를 생성하는 또 다른 방법이 있으며 
+이는 **ObservableChangeSet** 정적 클래스를 사용하는 것이다.
+```js
+// Using the ObservableChangeSet static class
+
+// An observable list can be created as follows:
+var myObservableList = ObservableChangeSet.Create<int>(observableList =>
+{
+    //some code to load data and subscribe
+    var loader= myService.LoadMyDataObservable().Subscribe(observableList.Add);
+    var subscriber = 
+        myService.GetMySubscriptionsObservable().Subscribe(observableList .Add);
+    //dispose of resources
+    return new CompositeDisposable(loader,subscriber );
+});
+
+// and creating a cache is almost identical except a key has to be specified
+var myObservableCache = ObservableChangeSet.Create<Trade, int>(observableCache =>
+{
+  //code omitted
+}, trade = > trade.Id);
+```
+#
+## 요약
+```js
+// 1. 데이터 소스:
+SourceCache<TObject, TKey>, SourceList<TObject>
+
+// 2. 데이타 소스에 바로 edit methods 사용
+SourceCache<TObject, TKey>.AddOrUpdata(Items);
+SourceCache<TObject, TKey>.Edit(cache => cache.AddOrUpdata(Items));
+
+// 3. 데이타 소스에서 바로 읽기 전용 public으로 노출할 때
+//    새로운 observable list를 만든다.
+IObservableCache<TObject,TKey> 
+    SourceCache<TObject, TKey>.AsObservableCache();
+
+
+// 4. Creating Observable Change Sets : IObservable<IChangeSet<TObject,TKey>>
+
+// 4.1 데이타 소스에 바로 연결
+IObservable<IChangeSet<TObject,TKey>> 
+    SourceCache<TObject, TKey>.Connect();
+
+// 4.2 from an Rx Observable.
+//     form an Observable Collection.
+//     from an Binding List.
+IObservable<IChangeSet<TObject,TKey>> 
+    IObservable<IEnumerable<T>>.ToObservableChangeSet(t=> t.key);
+
+// 4.3 ObservableChacneSet 정적 클래스 사용
+IObservable<IChangeSet<TObject,TKey>> 
+    ObservableChangeSet.Create<Trade, long>(ISourceCache<Trade, long> =>
+    {
+        ISourceCache<TObject, TKey>.AddOrUpdate(IEnumerable<trade>);
+    }, trade = > trade.Id);
+```
+#
+## Observable list vs observable cache
+`observable cache`는 고유 한 ID가 있는 경우, 중복이 추가되지 않고 추가, 
+업데이트 및 제거시 알림을 제공하는 dictionary 기반이므로 관찰 가능한 캐시를 사용해야한다. 
+반면 `Observable list`는 중복을 허용하고 업데이트 개념만 없다.
+#
+또 다른 차이점이 있다. 동적 데이터의 캐시 쪽은 훨씬 더 성숙하고 더 광범위한 연산자를 가지고 있다. 
+더 많은 연산자를 갖는 것은 주로 키 기반 연산자로 좋은 모든 라운드 성능을 달성하는 것이 더 쉬우며 
+본질적으로 성능이 좋지 않은 동적 데이터에 아무것도 추가하고 싶지 않기 때문이다.

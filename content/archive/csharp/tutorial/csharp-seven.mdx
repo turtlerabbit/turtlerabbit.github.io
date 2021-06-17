@@ -1,0 +1,140 @@
+---
+title: C# 7.0
+date: '2021-01-09 03'
+tag: csharp, C#, tutorial, 7.0, 
+---
+
+```js
+static void Main(string[] args)
+{
+    //Digit Separator 숫자 구분자: 코드상에서 자릿수 구분 편의
+    int num = 1_000_000;
+    Console.WriteLine(num);
+
+    // Binary Literal: 0b, 0B
+    //int[] numbers = { 1, 2, 4, 8 }; // 10진수
+    int[] numbers = { 0b01, 0b10, 0b0100, 0b0000_1000 }; // 2진수
+
+    foreach (var n in numbers)
+    {
+        Console.WriteLine(n);
+    }
+
+    Console.WriteLine();
+
+    // Tuple
+    var t = Tally();
+    Console.WriteLine($"{t.Item1}, {t.Item2}, {t.Item3}");
+
+    Console.WriteLine();
+
+    var s = Tally2(numbers);
+    Console.WriteLine($"{s.Sum}, {s.Count}");
+
+    // Tuple Deconstruction (해체, 분해)
+    var (sum, count) = Tally2(numbers);
+    Console.WriteLine($"합계: {sum}, 카운트: {count}");
+
+    Console.WriteLine();
+
+    // if + is 연산자
+    PrintStars(null);
+    PrintStars("5");
+    PrintStars(5);
+
+    Console.WriteLine();
+
+    // switch, when
+    PrintShape(new Circle());
+    PrintShape(new Rectangle{Length = 200, Height = 100});
+    PrintShape(new Rectangle { Length = 100, Height = 100 });
+
+}
+
+// Tuple Return 튜플 반환값
+static (int, int, int) Tally()
+{
+    // Tuple : 하나의 이름으로 한개 이상의 어떤 값(변수)들을 
+    // 묶어(괄호를 사용해서) 놓은 그릇이다.
+    // Tuple Literal
+    var r = (12, 34, 56);
+    //Console.WriteLine($"{r.Item1}, {r.Item2}, {r.Item3}");
+
+    return r;
+}
+
+static (int Sum, int Count) Tally2(int[] values)
+{
+    var r = (s:0, c:0);
+    foreach (var v in values)
+    {
+        //r = (r.s + v, r.c + 1); // 매번 계산을 하고 매번 할당이 된다.
+        r.s += v; r.c++; // 직접 수정
+
+        // 로컬 함수(Local Function) : 특정한 메서드 안에 메서드를 만든다.
+        Add(v, 1);
+    }
+    return r;
+
+    // 로컬 함수(Local Function)
+    void Add(int s, int c)
+    {
+        r.s += s;
+        r.c += c;
+    }
+}
+
+// 패턴 매칭: if + is 연산자
+static void PrintStars(object o)
+{
+    if (o is null)
+    {
+        return;
+    }
+    if (o is string)
+    {
+        return;
+    }
+    if (!(o is int number)) // o가 int면 number 변수 선언과 동시에 캐스팅해서 값을 넣어두고 아니면 return;
+    {
+        return;
+    }
+    //Console.WriteLine(new String('*', (int)o));
+    Console.WriteLine(new String('*', number));
+}
+
+// 패턴 매칭: switch, when
+static void PrintShape(object shape)
+{
+    switch (shape)
+    {
+        case Rectangle s when (s.Length == s.Height):
+            Console.WriteLine($"정사각형: {s.Length} x {s.Height}");
+            break;
+        case Rectangle r:  // Rectangle면 r변수에 담는다.
+            Console.WriteLine($"직사각형: {r.Length} x {r.Height}");
+            break;
+        case Circle c:  // Circle면 c변수에 담는다.
+            Console.WriteLine($"원: 반지름({c.Radius})");
+            break;
+        case null:
+            throw new ArgumentNullException(nameof(shape));
+        default:
+            Console.WriteLine("<기타 도형>");
+            break;
+    }
+}
+
+class Circle
+{
+    public int Radius { get; set; } = 10;
+}
+
+class Rectangle
+{
+    public int Length { get; set; }
+    public int Height { get; set; }
+}
+```
+#
+[source](https://github.com/ledpink/CSharpVersion)

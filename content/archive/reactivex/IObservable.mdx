@@ -1,0 +1,44 @@
+---
+title: IObservable<T>
+date: '2021-01-09 08'
+tag: ReactiveX, tutorial, C#, IObservable, IDisposable, Observer, Subscribe, CreationOfObservables
+---
+
+```js
+public interface IObservable<out T>
+{
+    IDisposable Subscribe(IObserver<T> observer);
+}
+```
+#
+
+```IDisposable Subscribe(IObserver<T> observer)```  
+  - Subscribe = observer(관찰자)가 알림을 받도록 observable을 연결시킨다.  
+  - 관찰자(observer)의 의미는 알림을 받을 개체로 이해.   
+  - 구독한다(subscribe)의 의미는 observable과 observer을 연결시킨다로 이해.  
+  - 즉, 연결시키고 알림을 받을 개체를 투입.  
+#
+
+```IDisposable subscriber = Observable.Subscribe(observer)```  
+  - 구독자(subscriber)는 알림 수신을 중지 할 수 있도록하는 인터페이스에 대한 참조이다.  
+  - 구독자(subscriber)는 구독(subscription)을 하고 있는 행위자로 이해.  
+  - 즉, 구독자는 observable sequence를 구독했다.  
+#
+
+```subscriber.Dispose()```  
+  - observable과 observer과 연결 해제  
+  - 구독자(subscriber)는 구독(subscription)을 해제한다로 이해.  
+#
+
+```public static IObservable<Tsource> Create<TSource>(Func<IObserver<TSource>, IDisposable> subscribe) { }```  
+  - 구독(subscription)이 생성 될 때마다 실행될 델리게이트(= Subscribe method)를 지정할 수 있다.  
+  - Observable.Create()는 구독(subscription)을 생성한다.  
+  - 즉, 구독(subscription)은 custom Subscribe()를 담은 새로운 observable sequence를 생성한 것을 의미한다.  
+#
+
+```IDisposable subscriber = Observable.Subscribe(Console.WriteLine);```  
+  - 구독자는 생성한 observable sequence를 구독했다.  
+#
+[source](https://github.com/ledpink/ReactiveX/tree/main/Observable.Create.Console4net5)
+#
+[참고 사이트](http://introtorx.com/Content/v1.0.10621.0/04_CreatingObservableSequences.html#CreationOfObservables)

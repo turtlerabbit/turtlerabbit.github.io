@@ -1,0 +1,63 @@
+---
+title: Dynamic Data - AutoRefresh
+date: '2021-01-12 03'
+tag: DynamicData, AutoRefresh(), Count(), AutoRefresh For PropertyChanges
+---
+#
+### 1. AutoRefresh For PropertyChanges
+observable cache는 변경 가능한 속성 개념이 없다. It only knows about adds, updates and removes.  
+그러나 새로 고침의 개념이 있다. 이는 고유, 정렬, 필터링 및 그룹화(distinct, sort, filter and grouping)와 
+같은 downstream operators에 재평가를 지시하는 수동 방법이다.
+```js
+public IObservable<int> DistinctCount { get; }
+
+public AutoRefreshForPropertyChanges(IObservableCache<MutableThing, int> dataSource)
+{
+    /*
+     * 강제로 새로고침할 때, 수동으로 트리거해야한다.
+     * In this case property changes are monitored
+     * and the data source sends a refresh signal to all downstream operators.
+     */
+    DistinctCount = dataSource
+        .Connect()
+        .AutoRefresh(t => t.Value)
+        .Count();
+}
+
+#
+
+using (var cache = new SourceCache<MutableThing, int>(m => m.Id))
+{
+    int count = 0;
+    var sut = new AutoRefreshForPropertyChanges(cache);
+    sut.DistinctCount.Subscribe(x => count = x);
+
+    cache.AddOrUpdate(items);
+    Console.WriteLine(count);  // 4
+
+    // check remove works
+    cache.RemoveKey(4);
+    Console.WriteLine(count);   // 2
+
+    // check add works
+    cache.AddOrUpdate(new MutableThing(10, "z"));
+    Console.WriteLine(count);  // 3
+}
+```
+```js
+ObservableCacheEx.AutoRefresh();
+// Automatically refresh downstream operators when properties change.
+
+IObservable<IChangeSet<TObject, TKey>> 
+    IObservable<IChangeSet<TObject, TKey>>.AutoRefresh<TObject, TKey, TProperty>()
+    
+```
+```js
+Observable.Count();
+// observable sequence의 총 요소 수를 나타내는 System.Int32를 포함하는 
+// observable sequence를 반환한다.
+
+IObservable<int>
+    IObservable<IChangeSet<TObject, TKey>>.Count<IChangeSet<TObject, TKey>>();
+    
+```
